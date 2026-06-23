@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>History of Anatolia — 2000 BCE to Today</title>
+<style>
+  :root{
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: linear-gradient(160deg,#1b1f24,#2c3338 60%,#1b1f24);
+    color:#eef1f3;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  header{
+    text-align:center;
+    padding:22px 16px 10px;
+  }
+  header h1{
+    margin:0 0 4px;
+    font-size:1.9rem;
+    letter-spacing:0.5px;
+  }
+  header p{
+    margin:0;
+    color:#a9b4bd;
+    font-size:0.95rem;
+  }
+  .timeline-panel{
+    max-width:1000px;
+    margin:18px auto 8px;
+    padding:16px 22px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+  }
+  .era-title{
+    text-align:center;
+    font-size:1.25rem;
+    font-weight:600;
+    color:#ffd97a;
+    margin-bottom:2px;
+  }
+  .year-readout{
+    text-align:center;
+    font-size:1rem;
+    color:#cdd6dd;
+    margin-bottom:12px;
+  }
+  .slider-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  #playBtn{
+    background:#ffd97a;
+    color:#2c3338;
+    border:none;
+    border-radius:50%;
+    width:42px;
+    height:42px;
+    font-size:1.1rem;
+    cursor:pointer;
+    flex:0 0 auto;
+    transition:transform .15s ease;
+  }
+  #playBtn:hover{ transform:scale(1.08); }
+  input[type=range]{
+    flex:1 1 auto;
+    -webkit-appearance:none;
+    height:8px;
+    border-radius:5px;
+    background:linear-gradient(90deg,#3a4750,#8a5a30,#b5752f,#c0392b);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:#ffd97a;
+    border:3px solid #2c3338;
+    cursor:pointer;
+    box-shadow:0 0 6px rgba(0,0,0,0.5);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:#ffd97a;
+    border:3px solid #2c3338;
+    cursor:pointer;
+  }
+  .tick-labels{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.7rem;
+    color:#7e8b94;
+    margin-top:6px;
+    padding:0 2px;
+  }
+  .main-area{
+    max-width:1000px;
+    margin:14px auto;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .map-card{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:10px;
+  }
+  svg#map{
+    width:100%;
+    height:auto;
+    display:block;
+  }
+  .region{
+    stroke:#1b1f24;
+    stroke-width:3;
+    cursor:pointer;
+    transition:fill .5s ease, opacity .2s ease, filter .2s ease;
+  }
+  .region:hover{
+    filter:brightness(1.18);
+  }
+  .region.selected{
+    stroke:#ffd97a;
+    stroke-width:5;
+  }
+  .region-label{
+    pointer-events:none;
+    text-anchor:middle;
+    fill:#fff;
+    font-size:13px;
+    font-weight:600;
+    text-shadow:0 1px 3px rgba(0,0,0,0.85);
+  }
+  .region-sublabel{
+    pointer-events:none;
+    text-anchor:middle;
+    fill:#f4f4f4;
+    font-size:10.5px;
+    text-shadow:0 1px 3px rgba(0,0,0,0.85);
+  }
+  .sea-label{
+    fill:#7fb3d5;
+    font-size:11px;
+    font-style:italic;
+    text-anchor:middle;
+    pointer-events:none;
+  }
+  .info-panel{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px;
+    padding:18px 22px;
+    min-height:120px;
+  }
+  .info-panel h2{
+    margin:0 0 4px;
+    font-size:1.2rem;
+    color:#ffd97a;
+  }
+  .info-panel .region-name{
+    margin:0 0 10px;
+    font-size:0.85rem;
+    color:#9fb0bc;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .info-panel p{
+    margin:0;
+    line-height:1.5;
+    color:#e3e7ea;
+  }
+  .hint{
+    text-align:center;
+    color:#7e8b94;
+    font-size:0.85rem;
+    margin-top:4px;
+  }
+  .swatch{
+    display:inline-block;
+    width:12px;
+    height:12px;
+    border-radius:3px;
+    margin-right:6px;
+    vertical-align:-1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The History of Anatolia</h1>
+  <p>2000 BCE &mdash; Today &middot; drag the slider or press play, then click a region of the map</p>
+</header>
+
+<div class="timeline-panel">
+  <div class="era-title" id="eraTitle">&nbsp;</div>
+  <div class="year-readout" id="yearReadout">&nbsp;</div>
+  <div class="slider-row">
+    <button id="playBtn" title="Play / Pause">&#9658;</button>
+    <input type="range" id="slider" min="-2000" max="2026" step="1" value="-2000">
+  </div>
+  <div class="tick-labels">
+    <span>2000 BCE</span>
+    <span>1000 BCE</span>
+    <span>1 CE</span>
+    <span>1000 CE</span>
+    <span>Today</span>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="map-card">
+    <svg id="map" viewBox="0 0 1000 560" xmlns="http://www.w3.org/2000/svg">
+      <text class="sea-label" x="550" y="35">Black Sea</text>
+      <text class="sea-label" x="60" y="300" transform="rotate(-90 60 300)">Aegean Sea</text>
+      <text class="sea-label" x="520" y="545">Mediterranean Sea</text>
+
+      <polygon id="r-marmara" class="region" data-id="marmara" points="170,80 300,65 300,150 140,160"></polygon>
+      <polygon id="r-blacksea" class="region" data-id="blacksea" points="300,65 430,55 700,90 900,180 680,250 520,180 300,150"></polygon>
+      <polygon id="r-east" class="region" data-id="east" points="900,180 930,340 820,460 700,380 680,250"></polygon>
+      <polygon id="r-mediterranean" class="region" data-id="mediterranean" points="820,460 680,430 560,480 380,480 200,420 300,330 520,380 700,380"></polygon>
+      <polygon id="r-aegean" class="region" data-id="aegean" points="140,160 120,280 200,420 300,330 300,150"></polygon>
+      <polygon id="r-central" class="region" data-id="central" points="300,150 520,180 680,250 700,380 520,380 300,330"></polygon>
+
+      <text class="region-label" x="235" y="112">Marmara</text>
+      <text class="region-sublabel" id="lbl-marmara" x="235" y="127">&nbsp;</text>
+
+      <text class="region-label" x="560" y="135">Black Sea Coast</text>
+      <text class="region-sublabel" id="lbl-blacksea" x="560" y="150">&nbsp;</text>
+
+      <text class="region-label" x="190" y="285">Aegean</text>
+      <text class="region-sublabel" id="lbl-aegean" x="190" y="300">&nbsp;</text>
+
+      <text class="region-label" x="495" y="258">Central</text>
+      <text class="region-sublabel" id="lbl-central" x="495" y="273">&nbsp;</text>
+
+      <text class="region-label" x="500" y="430">Mediterranean</text>
+      <text class="region-sublabel" id="lbl-mediterranean" x="500" y="445">&nbsp;</text>
+
+      <text class="region-label" x="810" y="305">Eastern</text>
+      <text class="region-sublabel" id="lbl-east" x="810" y="320">&nbsp;</text>
+    </svg>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <h2 id="infoTitle">Welcome</h2>
+    <p class="region-name" id="infoRegion">Anatolia, 2000 BCE &ndash; Today</p>
+    <p id="infoText">Move the timeline slider to travel through nearly four thousand years of Anatolian history, then click any region of the map to read about the people who lived there.</p>
+  </div>
+  <div class="hint">Tip: while a region is selected, dragging the slider updates its story live.</div>
+</div>
+
+<script>
+/* ---------- Historical data ---------- */
+const REGION_NAMES = {
+  marmara: "Marmara & Thrace",
+  blacksea: "Black Sea Coast",
+  aegean: "Aegean Coast",
+  central: "Central Anatolia",
+  mediterranean: "Mediterranean Coast (Cilicia)",
+  east: "Eastern Anatolia"
+};
+
+const ERAS = [
+{ start:-2000, end:-1700, label:"Early Bronze Age: Assyrian Trade Colonies", regions:{
+  marmara:{nation:"Indigenous Tribes", color:"#b08968", text:"Scattered indigenous communities related to the Luwian and Thracian-speaking peoples inhabit the Marmara shores, with little central authority."},
+  blacksea:{nation:"Hattian & Kaska Peoples", color:"#a04000", text:"The native Hatti people, soon to be absorbed by incoming Hittites, share the rugged Black Sea hills with the fiercely independent Kaska tribes."},
+  aegean:{nation:"Luwian Principalities", color:"#d35400", text:"Small Luwian-speaking city-states dot the Aegean coast, trading with Minoan Crete and the Cycladic islands."},
+  central:{nation:"Kingdom of Kanesh (Assyrian Trade Colony)", color:"#ca6f1e", text:"Assyrian merchants establish the karum (trading colony) at Kanesh (Kultepe), exchanging tin and textiles with local Hatti rulers and introducing cuneiform writing."},
+  mediterranean:{nation:"Luwian Kingdoms (early Kizzuwatna)", color:"#e67e22", text:"Luwian-speaking chiefdoms in Cilicia control fertile coastal plains and trade routes toward Syria."},
+  east:{nation:"Hurrian City-States", color:"#8e44ad", text:"Hurrian-speaking city-states, ancestors of the later Mitanni kingdom, dominate the mountainous east."}
+}},
+{ start:-1700, end:-1450, label:"Old & Middle Hittite Kingdom", regions:{
+  marmara:{nation:"Mysian & Luwian Tribes", color:"#b08968", text:"Loosely organized Luwian-related tribal groups occupy the Marmara region, outside direct Hittite control."},
+  blacksea:{nation:"Kaska Tribes", color:"#a04000", text:"The Kaska remain unconquered raiders, repeatedly sacking the Hittite heartland and forcing it to be abandoned and rebuilt."},
+  aegean:{nation:"Kingdom of Arzawa", color:"#d35400", text:"The powerful Luwian kingdom of Arzawa dominates western Anatolia, frequently rivaling the Hittites for influence."},
+  central:{nation:"Hittite Old Kingdom", color:"#c0392b", text:"King Hattusili I and his successors found the Hittite Kingdom at Hattusa, conquering northern Syria and even sacking Babylon under Mursili I."},
+  mediterranean:{nation:"Kizzuwatna (Hittite vassal)", color:"#e67e22", text:"The kingdom of Kizzuwatna becomes a Hittite vassal, guarding the strategic Cilician Gates."},
+  east:{nation:"Kingdom of Mitanni", color:"#8e44ad", text:"The Hurrian-ruled Mitanni Empire dominates the upper Euphrates, rivaling both Hittites and Egyptians."}
+}},
+{ start:-1450, end:-1180, label:"Hittite Empire (New Kingdom)", regions:{
+  marmara:{nation:"Hittite Vassal Territory", color:"#c0392b", text:"The Marmara region falls within the loose orbit of Hittite vassal arrangements."},
+  blacksea:{nation:"Kaska Tribes", color:"#a04000", text:"Kaska raiders continue to threaten the Hittite capital throughout the empire's height."},
+  aegean:{nation:"Arzawa, then Hittite Vassal", color:"#d35400", text:"After repeated wars, Arzawa is broken up and its successor states become Hittite vassals."},
+  central:{nation:"Hittite Empire", color:"#c0392b", text:"Under Suppiluliuma I and Muwatalli II, the Hittite Empire becomes a superpower, fighting Egypt to a standstill at the Battle of Kadesh (1274 BCE)."},
+  mediterranean:{nation:"Kizzuwatna / Hittite Province", color:"#e67e22", text:"Cilicia remains firmly under Hittite control, a vital link to Hittite Syria."},
+  east:{nation:"Hittite-Assyrian Frontier", color:"#8e44ad", text:"Mitanni collapses under Hittite and Assyrian pressure, and the region becomes a contested frontier between the two empires."}
+}},
+{ start:-1180, end:-900, label:"Bronze Age Collapse & Rise of New Peoples", regions:{
+  marmara:{nation:"Phrygian & Thracian Migrants", color:"#f39c12", text:"Phrygian-speaking migrants from the Balkans cross the straits, settling the region after the Hittite collapse."},
+  blacksea:{nation:"Kaska & Proto-Pontic Tribes", color:"#a04000", text:"Local tribal groups persist largely undisturbed as the great empires to the south collapse."},
+  aegean:{nation:"Early Greek Colonization", color:"#2e86c1", text:"Aeolian and Ionian Greeks begin settling the Aegean coast amid the chaos following the Bronze Age collapse."},
+  central:{nation:"Early Phrygian Settlement", color:"#f39c12", text:"Phrygian newcomers settle the former Hittite heartland as the great empire's capital Hattusa lies in ruins."},
+  mediterranean:{nation:"Neo-Hittite States (Tabal)", color:"#cd6155", text:"Luwian successor states, the Neo-Hittite kingdoms, preserve Hittite culture and hieroglyphic writing in the south."},
+  east:{nation:"Neo-Hittite & Early Urartu", color:"#6c3483", text:"Neo-Hittite cities like Carchemish and Melid thrive while the kingdom of Urartu begins to coalesce around Lake Van."}
+}},
+{ start:-900, end:-650, label:"Phrygia, Urartu & Early Lydia", regions:{
+  marmara:{nation:"Phrygian Kingdom", color:"#f39c12", text:"The Phrygian kingdom extends its influence toward the Marmara region and the Bithynian tribes."},
+  blacksea:{nation:"Cimmerian Invasions", color:"#707b7c", text:"Nomadic Cimmerians sweep down from the steppe, raiding Phrygia and the Pontic region and eventually destroying the Phrygian capital Gordion."},
+  aegean:{nation:"Lydian & Greek City-States", color:"#f1c40f", text:"The Lydian kingdom rises around Sardis while Ionian Greek cities such as Miletus flourish along the coast."},
+  central:{nation:"Phrygian Kingdom", color:"#f39c12", text:"King Midas rules a wealthy Phrygian kingdom from Gordion, famed in Greek legend for his golden touch."},
+  mediterranean:{nation:"Assyrian Vassal States", color:"#1f618d", text:"Neo-Hittite Tabal and Cilician states fall under the shadow of the expanding Neo-Assyrian Empire."},
+  east:{nation:"Kingdom of Urartu", color:"#6c3483", text:"Urartu becomes a major regional power, building fortresses and irrigation works around Lake Van, rivaling Assyria."}
+}},
+{ start:-650, end:-547, label:"Lydian Kingdom", regions:{
+  marmara:{nation:"Lydian Kingdom", color:"#f1c40f", text:"Lydian authority extends north as Phrygia is absorbed into a growing Lydian realm."},
+  blacksea:{nation:"Paphlagonian Tribes", color:"#707b7c", text:"Local Paphlagonian and Pontic peoples remain loosely organized, on the fringe of Lydian influence."},
+  aegean:{nation:"Lydian Kingdom", color:"#f1c40f", text:"King Croesus rules a fabulously wealthy Lydia from Sardis, inventing coinage and dominating the Ionian Greek cities."},
+  central:{nation:"Lydian Kingdom", color:"#f1c40f", text:"Lydia absorbs the former Phrygian heartland, pushing its eastern border to the Halys River."},
+  mediterranean:{nation:"Cilicia (Syennesis Dynasty)", color:"#1f618d", text:"A semi-independent Cilician kingdom under local Syennesis rulers maintains ties with Assyria and later Babylon."},
+  east:{nation:"Median Expansion / Urartu Decline", color:"#6c3483", text:"Urartu weakens under attacks from Scythians and the rising Median Empire to the east."}
+}},
+{ start:-547, end:-334, label:"Achaemenid Persian Empire", regions:{
+  marmara:{nation:"Satrapy of Hellespontine Phrygia", color:"#2980b9", text:"After Cyrus the Great defeats Croesus, the region becomes a Persian satrapy guarding the crossing into Europe."},
+  blacksea:{nation:"Satrapy of Pontus/Paphlagonia", color:"#2980b9", text:"Persian governors hold loose control over the Pontic and Paphlagonian coasts, relying on local dynasts."},
+  aegean:{nation:"Satrapy of Ionia/Lydia", color:"#2980b9", text:"Greek Ionian cities revolt against Persian rule in 499 BCE, sparking the Greco-Persian Wars, but remain under Persian satraps."},
+  central:{nation:"Satrapy of Cappadocia", color:"#2980b9", text:"Cappadocia becomes a Persian satrapy, its Royal Road linking Sardis to Susa passing through the region."},
+  mediterranean:{nation:"Satrapy of Cilicia", color:"#2980b9", text:"Cilicia retains a degree of local dynastic rule under Persian overlordship, supplying ships to the Persian navy."},
+  east:{nation:"Satrapy of Armenia", color:"#2980b9", text:"Armenia and the old Urartian lands become a Persian satrapy, providing cavalry to the Great King's armies."}
+}},
+{ start:-334, end:-323, label:"Alexander the Great's Conquest", regions:{
+  marmara:{nation:"Macedonian Conquest", color:"#27ae60", text:"Alexander crosses the Hellespont in 334 BCE, defeating the Persians at the Granicus River nearby."},
+  blacksea:{nation:"Macedonian Conquest", color:"#27ae60", text:"Macedonian control remains nominal along the remote Black Sea coast as Alexander focuses his march eastward."},
+  aegean:{nation:"Macedonian Conquest", color:"#27ae60", text:"Greek cities are 'liberated' from Persian rule as Alexander marches down the Ionian coast."},
+  central:{nation:"Macedonian Conquest", color:"#27ae60", text:"Alexander famously cuts the Gordian Knot at Gordion before pressing on toward Cilicia."},
+  mediterranean:{nation:"Macedonian Conquest", color:"#27ae60", text:"Alexander defeats Darius III at the Battle of Issus (333 BCE) near the Cilician coast."},
+  east:{nation:"Macedonian Conquest", color:"#27ae60", text:"Macedonian forces secure the eastern highlands as Alexander turns south toward Syria and Egypt."}
+}},
+{ start:-323, end:-133, label:"Hellenistic Kingdoms", regions:{
+  marmara:{nation:"Kingdom of Bithynia", color:"#2ecc71", text:"The independent Kingdom of Bithynia resists the Diadochi and later allies with Rome against Pontus."},
+  blacksea:{nation:"Kingdom of Pontus", color:"#1abc9c", text:"The Kingdom of Pontus, founded by a Persian-descended dynasty, grows into a major Black Sea power under Mithridates."},
+  aegean:{nation:"Kingdom of Pergamon", color:"#16a085", text:"The Attalid dynasty turns Pergamon into a dazzling center of Hellenistic art, learning, and its famous library."},
+  central:{nation:"Galatia & Cappadocia", color:"#58d68d", text:"Celtic Galatian tribes settle central Anatolia after crossing from Europe, coexisting with the Hellenized Cappadocian kingdom."},
+  mediterranean:{nation:"Seleucid Empire (Cilicia)", color:"#138d75", text:"Cilicia falls under Seleucid control, its mountainous interior becoming notorious for piracy."},
+  east:{nation:"Seleucid Empire / Kingdom of Armenia", color:"#138d75", text:"The Seleucids contest the eastern highlands with a newly resurgent Kingdom of Armenia."}
+}},
+{ start:-133, end:395, label:"Roman Republic & Empire", regions:{
+  marmara:{nation:"Roman Province of Bithynia", color:"#922b21", text:"Bithynia is bequeathed to Rome in 74 BCE, becoming a prosperous Roman province along the vital Marmara crossing."},
+  blacksea:{nation:"Roman Province of Pontus", color:"#922b21", text:"Rome finally defeats Mithridates VI of Pontus after decades of war, annexing the Black Sea coast."},
+  aegean:{nation:"Roman Province of Asia", color:"#922b21", text:"Pergamon's last king wills his realm to Rome in 133 BCE, creating the wealthy province of Asia, a hub of trade and early Christianity."},
+  central:{nation:"Roman Province of Galatia", color:"#922b21", text:"Galatia becomes a Roman province; the Apostle Paul addresses an early Christian letter to its churches."},
+  mediterranean:{nation:"Roman Province of Cilicia", color:"#922b21", text:"Pompey crushes Cilician pirates and organizes the region into a Roman province along key Mediterranean trade routes."},
+  east:{nation:"Cappadocia / Armenia Minor", color:"#922b21", text:"Rome and Parthia, later Sassanid Persia, contest influence over Armenia and the eastern frontier for centuries."}
+}},
+{ start:395, end:1071, label:"Byzantine Empire", regions:{
+  marmara:{nation:"Byzantine Empire (Constantinople)", color:"#5b2c6f", text:"Constantinople, capital of the Eastern Roman Empire, becomes the greatest city in Christendom, guarding the Bosphorus."},
+  blacksea:{nation:"Byzantine Empire", color:"#5b2c6f", text:"Byzantine themes administer the Black Sea coast, fending off Arab raids and later Turkish pressure."},
+  aegean:{nation:"Byzantine Empire", color:"#5b2c6f", text:"The Aegean theme remains a prosperous, well-defended heartland of Byzantine civilization."},
+  central:{nation:"Byzantine Empire", color:"#5b2c6f", text:"Central Anatolia forms the Byzantine breadbasket and military recruiting ground via the theme system."},
+  mediterranean:{nation:"Byzantine Frontier with Caliphate", color:"#76448a", text:"Cilicia becomes a fluctuating frontier zone between Byzantium and the Arab Caliphates from the 7th century onward."},
+  east:{nation:"Byzantine-Arab Frontier", color:"#76448a", text:"Eastern Anatolia is a contested borderland between Byzantium, Armenian princes, and the Arab Caliphates."}
+}},
+{ start:1071, end:1243, label:"Seljuk Turks: Sultanate of Rum", regions:{
+  marmara:{nation:"Byzantine / Latin Empire (1204)", color:"#5b2c6f", text:"Constantinople remains Byzantine until the Fourth Crusade sacks it in 1204, installing a short-lived Latin Empire."},
+  blacksea:{nation:"Empire of Trebizond", color:"#6c3483", text:"A Byzantine successor state, the Empire of Trebizond, rules the eastern Black Sea coast from 1204."},
+  aegean:{nation:"Byzantine Empire (Nicaea)", color:"#5b2c6f", text:"After 1204 the Byzantines regroup as the Empire of Nicaea, holding the Aegean coast and aiming to reclaim Constantinople."},
+  central:{nation:"Seljuk Sultanate of Rum", color:"#117864", text:"Following victory at Manzikert in 1071, the Seljuk Turks establish the Sultanate of Rum at Konya, ushering in Anatolia's Turkification."},
+  mediterranean:{nation:"Armenian Kingdom of Cilicia", color:"#b7950b", text:"Armenian refugees from the east found the Kingdom of Cilicia, a key Crusader ally on the Mediterranean coast."},
+  east:{nation:"Seljuk Rum / Georgian-Armenian Princes", color:"#117864", text:"Seljuk Turks contest the eastern highlands with Georgian and Armenian principalities."}
+}},
+{ start:1243, end:1300, label:"Mongol Invasion & Anatolian Beyliks", regions:{
+  marmara:{nation:"Byzantine Empire (restored 1261)", color:"#5b2c6f", text:"The Byzantines retake Constantinople in 1261, but their restored empire is greatly weakened."},
+  blacksea:{nation:"Trebizond / Ilkhanate Influence", color:"#6c3483", text:"Trebizond survives as a Mongol Ilkhanate tributary, prospering from Silk Road trade."},
+  aegean:{nation:"Byzantine Remnants / Emerging Beyliks", color:"#45b39d", text:"Byzantine control frays as Turkish frontier warriors, the future Aydinid and Saruhanid beys, begin carving out territory."},
+  central:{nation:"Sultanate of Rum (Mongol Vassal)", color:"#784212", text:"Crushed by the Mongols at Kosedag in 1243, the Seljuk Sultanate becomes an Ilkhanate vassal and gradually disintegrates."},
+  mediterranean:{nation:"Armenian Cilicia / Karamanid Beylik", color:"#b7950b", text:"Armenian Cilicia persists as a Mongol-allied kingdom while the Turkish Karamanid beylik rises in the Taurus mountains."},
+  east:{nation:"Ilkhanate (Mongol Empire)", color:"#784212", text:"The Mongol Ilkhanate rules eastern Anatolia directly, devastating but also reconnecting the region to a vast Eurasian trade network."}
+}},
+{ start:1300, end:1453, label:"Ottoman Rise & the Beyliks", regions:{
+  marmara:{nation:"Ottoman Beylik", color:"#196f3d", text:"A small Turkish beylik founded by Osman grows rapidly, capturing Bursa and Edirne and laying siege to Constantinople itself by 1453."},
+  blacksea:{nation:"Trebizond / Ottoman Expansion", color:"#6c3483", text:"Trebizond survives as the last Byzantine successor state while Ottoman power steadily encircles the Black Sea coast."},
+  aegean:{nation:"Aydinid & Saruhanid Beyliks", color:"#45b39d", text:"Maritime Turkish beyliks raid the Aegean before being absorbed one by one into the expanding Ottoman state."},
+  central:{nation:"Karamanid Beylik", color:"#52be80", text:"The Karamanids, rivals to the Ottomans, hold central Anatolia, even briefly reviving Seljuk claims to legitimacy."},
+  mediterranean:{nation:"Ramadanid Beylik / Mamluk Influence", color:"#b7950b", text:"Armenian Cilicia falls to the Mamluks in 1375; Turkish Ramadanid begs later govern the coast under Mamluk suzerainty."},
+  east:{nation:"Beyliks & Timurid Invasion", color:"#784212", text:"Local Turkish beys hold the east until Timur's devastating invasion crushes the Ottomans at Ankara in 1402."}
+}},
+{ start:1453, end:1922, label:"Ottoman Empire", regions:{
+  marmara:{nation:"Ottoman Empire (Istanbul, capital)", color:"#196f3d", text:"Sultan Mehmed II conquers Constantinople in 1453, renaming it Istanbul and making it the magnificent capital of a vast empire."},
+  blacksea:{nation:"Ottoman Empire", color:"#196f3d", text:"Trebizond falls in 1461, completing Ottoman control of the Black Sea coast."},
+  aegean:{nation:"Ottoman Empire", color:"#196f3d", text:"The Aegean coast becomes a thriving hub of Ottoman maritime trade, shipbuilding, and cosmopolitan port cities like Izmir."},
+  central:{nation:"Ottoman Empire", color:"#196f3d", text:"Central Anatolia is fully absorbed by 1487, becoming the agricultural and demographic core of the empire."},
+  mediterranean:{nation:"Ottoman Empire", color:"#196f3d", text:"Ottoman conquest of the Mamluks in 1516-17 secures the entire Mediterranean coastline of Anatolia."},
+  east:{nation:"Ottoman Empire", color:"#196f3d", text:"The east remains a contested frontier with Safavid and later Qajar Persia, home to large Armenian and Kurdish populations until the empire's collapse after WWI."}
+}},
+{ start:1923, end:2026, label:"Republic of Turkey", regions:{
+  marmara:{nation:"Republic of Turkey", color:"#c0392b", text:"Istanbul, though no longer the capital, remains Turkey's largest city and economic engine on the Marmara Sea."},
+  blacksea:{nation:"Republic of Turkey", color:"#c0392b", text:"The Black Sea coast is known for tea and hazelnut cultivation and the port city of Trabzon."},
+  aegean:{nation:"Republic of Turkey", color:"#c0392b", text:"The Aegean region thrives on tourism, agriculture, and trade through Izmir, Turkey's third-largest city."},
+  central:{nation:"Republic of Turkey", color:"#c0392b", text:"Ankara, in central Anatolia, is chosen as the new republic's capital by Mustafa Kemal Ataturk in 1923."},
+  mediterranean:{nation:"Republic of Turkey", color:"#c0392b", text:"The Mediterranean coast, especially around Antalya, becomes one of the world's major tourist destinations."},
+  east:{nation:"Republic of Turkey", color:"#c0392b", text:"Eastern Anatolia remains the republic's most mountainous and ethnically diverse region, home to a large Kurdish population."}
+}}
+];
+
+/* ---------- Helpers ---------- */
+function formatYear(y){
+  if(y < 0) return Math.abs(y) + " BCE";
+  if(y === 0) return "1 BCE/CE";
+  if(y >= 2026) return "Today";
+  return y + " CE";
+}
+
+function eraForYear(y){
+  for(const era of ERAS){
+    if(y >= era.start && y < era.end) return era;
+  }
+  return ERAS[ERAS.length - 1];
+}
+
+/* ---------- DOM refs ---------- */
+const slider = document.getElementById('slider');
+const eraTitle = document.getElementById('eraTitle');
+const yearReadout = document.getElementById('yearReadout');
+const infoTitle = document.getElementById('infoTitle');
+const infoRegion = document.getElementById('infoRegion');
+const infoText = document.getElementById('infoText');
+const playBtn = document.getElementById('playBtn');
+const regionEls = {};
+Object.keys(REGION_NAMES).forEach(id => {
+  regionEls[id] = document.getElementById('r-' + id);
+});
+
+let selectedRegion = null;
+
+function render(year){
+  const era = eraForYear(year);
+  eraTitle.textContent = era.label;
+  yearReadout.textContent = formatYear(era.start) + " – " + formatYear(era.end) + "  (showing " + formatYear(year) + ")";
+
+  Object.keys(REGION_NAMES).forEach(id => {
+    const data = era.regions[id];
+    const el = regionEls[id];
+    el.setAttribute('fill', data.color);
+    el.setAttribute('title', data.nation);
+    const sub = document.getElementById('lbl-' + id);
+    if(sub) sub.textContent = data.nation;
+  });
+
+  if(selectedRegion){
+    showRegionInfo(selectedRegion, era);
+  }
+}
+
+function showRegionInfo(id, era){
+  const data = era.regions[id];
+  infoTitle.textContent = data.nation;
+  infoRegion.textContent = REGION_NAMES[id] + " · " + era.label;
+  infoText.textContent = data.text;
+}
+
+function selectRegion(id){
+  if(selectedRegion && regionEls[selectedRegion]){
+    regionEls[selectedRegion].classList.remove('selected');
+  }
+  selectedRegion = id;
+  regionEls[id].classList.add('selected');
+  const era = eraForYear(parseInt(slider.value, 10));
+  showRegionInfo(id, era);
+}
+
+Object.keys(regionEls).forEach(id => {
+  regionEls[id].addEventListener('click', () => selectRegion(id));
+});
+
+slider.addEventListener('input', () => {
+  render(parseInt(slider.value, 10));
+});
+
+/* ---------- Play / pause animation ---------- */
+let playing = false;
+let playInterval = null;
+const STEP_YEARS = 12;
+const TICK_MS = 90;
+
+function startPlaying(){
+  playing = true;
+  playBtn.innerHTML = "&#10074;&#10074;";
+  playInterval = setInterval(() => {
+    let next = parseInt(slider.value, 10) + STEP_YEARS;
+    if(next > 2026){
+      next = -2000;
+    }
+    slider.value = next;
+    render(next);
+  }, TICK_MS);
+}
+
+function stopPlaying(){
+  playing = false;
+  playBtn.innerHTML = "&#9658;";
+  clearInterval(playInterval);
+}
+
+playBtn.addEventListener('click', () => {
+  if(playing) stopPlaying();
+  else startPlaying();
+});
+
+/* ---------- Init ---------- */
+render(parseInt(slider.value, 10));
+</script>
+</body>
+</html>
+
