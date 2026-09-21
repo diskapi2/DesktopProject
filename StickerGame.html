@@ -112,6 +112,41 @@
         .casino-border-glow {
             animation: casinoBorderFlash 0.3s infinite;
         }
+
+        /* MODE MENU CARDS */
+        .mode-card {
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .mode-card:hover { transform: translateY(-2px) scale(1.03); }
+        .mode-card:active { transform: scale(0.95); }
+        .mode-card.active {
+            border-color: #ff007f;
+            background-color: rgba(255, 0, 127, 0.22);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
+        }
+
+        /* REWARD HUD: JACKPOT LAMP + RUNNING TOTAL */
+        @keyframes lampBlink {
+            0%, 100% { background-color: #ffd700; box-shadow: 0 0 22px #ffd700, 0 0 40px rgba(255, 215, 0, 0.7); color: #3a2a00; border-color: #fff8c0; }
+            50% { background-color: #ff007f; box-shadow: 0 0 22px #ff007f, 0 0 40px rgba(255, 0, 127, 0.7); color: #ffffff; border-color: #ffd0e8; }
+        }
+        .jackpot-lamp {
+            background-color: rgba(60, 60, 80, 0.8);
+            color: #8a8aa0;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .jackpot-lamp.lit {
+            animation: lampBlink 0.25s infinite;
+        }
+        @keyframes scorePop {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.6); color: #ffffff; }
+            100% { transform: scale(1); }
+        }
+        .score-pop {
+            animation: scorePop 0.45s ease-out;
+        }
     </style>
 </head>
 <body class="w-screen h-screen relative overflow-hidden select-none">
@@ -135,6 +170,30 @@
             </div>
         </div>
     </div>
+
+    <!-- TOP LEFT: REWARD HUD (Jackpot lamp + running total; shown in Reward & Letter modes) -->
+    <div id="rewardHud" class="hidden absolute top-4 left-4 z-20 pointer-events-none flex flex-col items-start gap-2">
+        <div class="glass-panel rounded-2xl px-3 py-2 shadow-xl flex items-center gap-3 border border-white/20">
+            <div id="jackpotLamp" class="jackpot-lamp rounded-xl px-3 py-1.5 font-black text-xs sm:text-sm tracking-widest uppercase flex items-center gap-1.5">
+                <span>🎰</span><span>Jackpot</span>
+            </div>
+            <div class="flex flex-col leading-tight">
+                <span class="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Rewards</span>
+                <span id="rewardTotal" class="text-2xl font-black text-amber-300 drop-shadow-[0_0_8px_rgba(255,215,0,0.8)] inline-block origin-left">0</span>
+            </div>
+            <div class="flex flex-col leading-tight border-l border-gray-700/80 pl-3">
+                <span class="text-[10px] font-bold tracking-wider text-gray-400 uppercase">Level</span>
+                <span id="rewardLevel" class="text-lg font-black text-emerald-300">1</span>
+            </div>
+            <button id="rewardResetBtn" title="Reset rewards" class="pointer-events-auto w-8 h-8 rounded-lg bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-gray-400 hover:text-pink-400 flex items-center justify-center transition active:scale-95">
+                <i class="fa-solid fa-rotate-left text-xs"></i>
+            </button>
+        </div>
+        <div id="rewardHint" class="glass-panel rounded-xl px-3 py-1.5 text-[11px] font-semibold text-gray-200 border border-white/10">Tap inside the moving circle to win!</div>
+    </div>
+
+    <!-- Hidden input: summons the on-screen keyboard on touch devices in Letter mode -->
+    <input id="letterKeyInput" type="text" autocomplete="off" autocapitalize="characters" aria-label="Type the letter shown on screen" class="absolute opacity-0 w-px h-px top-0 left-0 pointer-events-none">
 
     <!-- TOP RIGHT: Controls Container -->
     <div class="absolute top-4 right-4 z-20 flex gap-3 pointer-events-none">
@@ -160,11 +219,26 @@
                 <i class="fa-solid fa-bars text-lg"></i>
             </button>
 
-            <!-- Mode Switcher Circle Button (Stickers <-> Neon Drawing) -->
-            <button id="modeToggleBtn" title="Switch between Stickers and Neon Drawing" class="w-12 h-12 sm:w-13 sm:h-13 rounded-full glass-panel shadow-xl flex items-center justify-center border-2 border-pink-500/60 text-pink-400 hover:text-white hover:bg-pink-600 hover:scale-110 active:scale-95 transition-all relative group">
-                <i id="modeIcon" class="fa-solid fa-paintbrush text-lg"></i>
-                <span id="modeBadge" class="absolute -top-1 -right-1 bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow">Draw</span>
+            <!-- Mode Switcher Circle Button (opens the mode menu: Stickers / Draw / Reward / Letter) -->
+            <button id="modeToggleBtn" title="Choose a game mode" class="w-12 h-12 sm:w-13 sm:h-13 rounded-full glass-panel shadow-xl flex items-center justify-center border-2 border-pink-500/60 text-pink-400 hover:text-white hover:bg-pink-600 hover:scale-110 active:scale-95 transition-all relative group">
+                <i id="modeIcon" class="fa-solid fa-shapes text-lg"></i>
+                <span id="modeBadge" class="absolute -top-1 -right-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow">Stickers</span>
             </button>
+
+            <!-- Mode Menu Popover -->
+            <div id="modeMenu" class="hidden absolute bottom-16 left-14 w-72 glass-panel rounded-2xl p-3 shadow-2xl border border-white/20 transition-all duration-200 origin-bottom-left z-30">
+                <div class="flex items-center justify-between border-b border-gray-700/80 pb-2 mb-2">
+                    <h3 class="font-bold text-gray-100 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-gamepad text-pink-500"></i> Choose a Mode
+                    </h3>
+                    <button id="closeModeMenuBtn" class="text-gray-400 hover:text-gray-200 p-1 rounded-lg">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div id="modeCards" class="grid grid-cols-2 gap-2">
+                    <!-- Mode cards populated by JS -->
+                </div>
+            </div>
 
             <!-- Menu Popover / Drawer -->
             <div id="miniMenuDrawer" class="hidden absolute bottom-16 left-0 w-72 glass-panel rounded-2xl p-4 shadow-2xl border border-white/20 flex flex-col gap-3 transition-all duration-200 origin-bottom-left z-30">
@@ -212,7 +286,7 @@
 
                 <!-- Placeholder Menu Selections -->
                 <div class="pt-2 border-t border-gray-700/60 space-y-1.5">
-                    <div class="text-[10px] font-bold tracking-wider text-gray-500 uppercase">Future Modes</div>
+                    <div class="text-[10px] font-bold tracking-wider text-gray-500 uppercase">Game modes: use the round button</div>
                     <button class="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-400 bg-gray-800/40 rounded-xl cursor-not-allowed opacity-70" disabled>
                         <span class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Neon Trail FX</span>
                         <span class="text-[9px] bg-purple-900/60 text-purple-300 px-1.5 py-0.5 rounded font-semibold">Soon</span>
@@ -468,6 +542,15 @@
             { id: 'neon_eraser', name: 'Neon Eraser', icon: 'fa-eraser', baseWidth: 32 }
         ];
 
+        // --- GAME MODE DEFINITIONS ---
+        const GAME_MODES = [
+            { id: 'stickers', name: 'Stickers', icon: 'fa-shapes', iconColor: 'text-pink-400', badge: 'Stickers', badgeClass: 'bg-pink-500 text-white', desc: 'Tap to stamp stickers' },
+            { id: 'drawing', name: 'Draw', icon: 'fa-paintbrush', iconColor: 'text-amber-400', badge: 'Draw', badgeClass: 'bg-amber-400 text-black', desc: 'Neon pens & sprays' },
+            { id: 'reward', name: 'Reward', icon: 'fa-bullseye', iconColor: 'text-emerald-400', badge: 'Reward', badgeClass: 'bg-emerald-400 text-black', desc: 'Catch the moving circle' },
+            { id: 'letter', name: 'Letter', icon: 'fa-font', iconColor: 'text-sky-400', badge: 'Letter', badgeClass: 'bg-sky-400 text-black', desc: 'Press the big letter' }
+        ];
+        const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
         // Background Presets
         const BACKGROUND_PRESETS = [
             { name: 'Dark Studio', color: '#121224', border: '#252548' },
@@ -522,8 +605,17 @@
             isMouseOnCanvas: false,
             isDrawing: false,
             isMusicPlaying: false,
-            animLoopActive: false
+            animLoopActive: false,
+            // Reward / Letter game state
+            rewards: 0,
+            target: null,      // moving reward circle { x, y, r, vx, vy }
+            letter: null,      // letter challenge { char, x, y, shakeUntil }
+            lampTimer: null
         };
+
+        function usesStickerDock() {
+            return state.mode === 'stickers' || state.mode === 'reward' || state.mode === 'letter';
+        }
 
         // Highly Optimized Caching for Patterns (Prevents GC Stuttering & Freezing)
         const patternCache = {};
@@ -606,6 +698,8 @@
         let mainDock, colorPickerBtn, currentColorDisplay, styleOverlayIcon, colorPaletteMenu;
         let bgSwatches, currentBgLabel, colorSwatches, glitterSwatches, uvSplatterSwatches, customColorPicker;
         let miniMenuBtn, miniMenuDrawer, closeMenuBtn, modeToggleBtn, modeIcon, modeBadge;
+        let modeMenu, modeCards, closeModeMenuBtn;
+        let rewardHud, rewardHint, jackpotLamp, rewardTotal, rewardLevel, rewardResetBtn, letterKeyInput;
         let fullscreenToggleBtn, fullscreenIcon;
         let musicToggleBtn, musicIcon, jackpotBanner, jackpotFlashOverlay;
         let btnUndo, btnClear, btnSave, stickerSizeSlider, sizeValueText, randomRotateToggle;
@@ -748,6 +842,24 @@
             } catch (e) {}
         }
 
+        function playWrongKeyBuzz() {
+            initAudioContext();
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(90, audioCtx.currentTime + 0.25);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch (e) {}
+        }
+
         function playCasinoJackpotTune() {
             initAudioContext();
             if (!audioCtx) return;
@@ -803,6 +915,7 @@
             bufferCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             rebakeBufferCanvas();
+            clampGameObjects();
             renderCanvas();
         }
 
@@ -1118,8 +1231,12 @@
                 updateAndDrawParticles();
             }
 
+            // Render Reward Target / Letter Challenge
+            if (state.mode === 'reward' && state.target) drawRewardTarget(now);
+            if (state.mode === 'letter' && state.letter) drawLetterChallenge(now);
+
             // Render Cursor Preview
-            if (state.isMouseOnCanvas && state.mode === 'stickers' && !state.isDrawing) {
+            if (state.isMouseOnCanvas && usesStickerDock() && !state.isDrawing) {
                 const activeStickerDef = STICKER_LIBRARY.find(s => s.id === state.activeStickerId);
                 if (activeStickerDef) {
                     ctx.save();
@@ -1131,14 +1248,25 @@
             }
         }
 
-        // Conditional Animation Loop for Particles & Jackpots
+        // Conditional Animation Loop for Particles, Jackpots & Game Modes
+        function needsContinuousAnimation() {
+            return state.particles.length > 0 ||
+                   state.activeAnimations.length > 0 ||
+                   state.mode === 'reward' ||
+                   state.mode === 'letter';
+        }
+
         function startAnimationLoop() {
             if (state.animLoopActive) return;
             state.animLoopActive = true;
+            let lastTs = performance.now();
 
-            function animStep() {
+            function animStep(ts) {
+                const dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000));
+                lastTs = ts;
+                if (state.mode === 'reward') updateRewardTarget(dt);
                 renderCanvas();
-                if (state.particles.length > 0 || state.activeAnimations.length > 0) {
+                if (needsContinuousAnimation()) {
                     requestAnimationFrame(animStep);
                 } else {
                     state.animLoopActive = false;
@@ -1147,12 +1275,336 @@
             requestAnimationFrame(animStep);
         }
 
+        // --- REWARD MODE: MOVING TARGET CIRCLE ---
+        // The circle shrinks and speeds up with every reward earned.
+        function rewardMetrics() {
+            const base = Math.min(window.innerWidth, window.innerHeight);
+            const level = state.rewards;
+            const radius = Math.max(base * 0.045, base * 0.16 * Math.pow(0.9, level));
+            const speed = Math.min(base * 1.6, base * 0.28 * (1 + level * 0.22));
+            return { radius, speed };
+        }
+
+        // Keeps moving objects clear of the HUD (top) and the toolbar (bottom)
+        function safeBounds(margin) {
+            const b = {
+                minX: margin + 8,
+                maxX: window.innerWidth - margin - 8,
+                minY: margin + 90,
+                maxY: window.innerHeight - margin - 100
+            };
+            if (b.maxX < b.minX) b.minX = b.maxX = window.innerWidth / 2;
+            if (b.maxY < b.minY) b.minY = b.maxY = window.innerHeight / 2;
+            return b;
+        }
+
+        function randomBetween(a, b) {
+            return a + Math.random() * (b - a);
+        }
+
+        function spawnRewardTarget(avoidX, avoidY) {
+            const { radius, speed } = rewardMetrics();
+            const b = safeBounds(radius);
+            let x, y, tries = 0;
+            do {
+                x = randomBetween(b.minX, b.maxX);
+                y = randomBetween(b.minY, b.maxY);
+                tries++;
+            } while (avoidX !== undefined && Math.hypot(x - avoidX, y - avoidY) < radius * 3 && tries < 12);
+
+            const angle = randomBetween(0.3, 1.2) + Math.floor(Math.random() * 4) * (Math.PI / 2);
+            state.target = {
+                x, y, r: radius,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed
+            };
+        }
+
+        function updateRewardTarget(dt) {
+            const t = state.target;
+            if (!t) return;
+            t.x += t.vx * dt;
+            t.y += t.vy * dt;
+            const b = safeBounds(t.r);
+            if (t.x < b.minX) { t.x = b.minX; t.vx = Math.abs(t.vx); }
+            else if (t.x > b.maxX) { t.x = b.maxX; t.vx = -Math.abs(t.vx); }
+            if (t.y < b.minY) { t.y = b.minY; t.vy = Math.abs(t.vy); }
+            else if (t.y > b.maxY) { t.y = b.maxY; t.vy = -Math.abs(t.vy); }
+        }
+
+        function clampGameObjects() {
+            if (state.target) {
+                const { radius, speed } = rewardMetrics();
+                const t = state.target;
+                const currentSpeed = Math.hypot(t.vx, t.vy) || 1;
+                t.r = radius;
+                t.vx = t.vx / currentSpeed * speed;
+                t.vy = t.vy / currentSpeed * speed;
+                const b = safeBounds(t.r);
+                t.x = Math.min(b.maxX, Math.max(b.minX, t.x));
+                t.y = Math.min(b.maxY, Math.max(b.minY, t.y));
+            }
+            if (state.letter) {
+                const b = safeBounds(letterSize() * 0.7);
+                state.letter.x = Math.min(b.maxX, Math.max(b.minX, state.letter.x));
+                state.letter.y = Math.min(b.maxY, Math.max(b.minY, state.letter.y));
+            }
+        }
+
+        function activeGlowColor() {
+            return state.styleType === 'uv' ? state.uvConfig.neonGlow : state.activeColor;
+        }
+
+        function drawRewardTarget(now) {
+            const t = state.target;
+            const pulse = 1 + Math.sin(now / 160) * 0.06;
+            const glow = activeGlowColor();
+
+            ctx.save();
+            ctx.translate(t.x, t.y);
+            ctx.scale(pulse, pulse);
+
+            // Soft fill + glowing gold ring
+            ctx.beginPath();
+            ctx.arc(0, 0, t.r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.16)';
+            ctx.fill();
+            ctx.lineWidth = Math.max(4, t.r * 0.12);
+            ctx.strokeStyle = '#FFD700';
+            ctx.shadowColor = glow;
+            ctx.shadowBlur = 25;
+            ctx.stroke();
+
+            // Rotating dashed inner ring in the active color
+            ctx.shadowBlur = 0;
+            ctx.save();
+            ctx.rotate(now / 900);
+            ctx.setLineDash([t.r * 0.35, t.r * 0.2]);
+            ctx.lineWidth = Math.max(2, t.r * 0.06);
+            ctx.strokeStyle = glow;
+            ctx.beginPath();
+            ctx.arc(0, 0, t.r * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            // Star in the middle
+            ctx.fillStyle = '#FFD700';
+            ctx.font = `900 ${Math.max(14, t.r * 0.6)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('★', 0, t.r * 0.04);
+            ctx.restore();
+        }
+
+        function handleRewardTap(x, y) {
+            const t = state.target;
+            const hit = !!t && Math.hypot(x - t.x, y - t.y) <= t.r;
+            // Sticker is always placed; the jackpot only lights up on a hit inside the circle
+            placeStamp(x, y, hit);
+            if (hit) {
+                awardReward();
+                spawnRewardTarget(x, y);
+            }
+        }
+
+        // --- LETTER MODE: BIG LETTER KEYBOARD CHALLENGE ---
+        function letterSize() {
+            return Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.22);
+        }
+
+        function spawnLetter() {
+            let char;
+            do {
+                char = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+            } while (state.letter && char === state.letter.char);
+
+            const b = safeBounds(letterSize() * 0.7);
+            state.letter = {
+                char,
+                x: randomBetween(b.minX, b.maxX),
+                y: randomBetween(b.minY, b.maxY),
+                shakeUntil: 0
+            };
+        }
+
+        function traceRoundedRect(context, x, y, w, h, r) {
+            const rr = Math.min(r, w / 2, h / 2);
+            context.beginPath();
+            context.moveTo(x + rr, y);
+            context.lineTo(x + w - rr, y);
+            context.quadraticCurveTo(x + w, y, x + w, y + rr);
+            context.lineTo(x + w, y + h - rr);
+            context.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+            context.lineTo(x + rr, y + h);
+            context.quadraticCurveTo(x, y + h, x, y + h - rr);
+            context.lineTo(x, y + rr);
+            context.quadraticCurveTo(x, y, x + rr, y);
+            context.closePath();
+        }
+
+        function drawLetterChallenge(now) {
+            const L = state.letter;
+            const s = letterSize();
+            const pulse = 1 + Math.sin(now / 220) * 0.05;
+            const shake = now < L.shakeUntil ? Math.sin(now / 18) * s * 0.06 : 0;
+            const glow = activeGlowColor();
+            const cardW = s * 1.3;
+            const cardH = s * 1.3;
+
+            ctx.save();
+            ctx.translate(L.x + shake, L.y);
+            ctx.scale(pulse, pulse);
+
+            // Glowing card behind the letter
+            traceRoundedRect(ctx, -cardW / 2, -cardH / 2, cardW, cardH, s * 0.2);
+            ctx.fillStyle = 'rgba(10, 10, 22, 0.78)';
+            ctx.fill();
+            ctx.lineWidth = Math.max(3, s * 0.05);
+            ctx.strokeStyle = shake ? '#FF4757' : '#FFD700';
+            ctx.shadowColor = shake ? '#FF4757' : glow;
+            ctx.shadowBlur = 30;
+            ctx.stroke();
+
+            // The big letter (~20% of the screen)
+            ctx.shadowBlur = 0;
+            ctx.font = `900 ${s}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = Math.max(4, s * 0.08);
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.strokeText(L.char, 0, s * 0.06);
+            ctx.fillStyle = glow;
+            ctx.shadowColor = glow;
+            ctx.shadowBlur = 18;
+            ctx.fillText(L.char, 0, s * 0.06);
+            ctx.restore();
+
+            // Hint under the card
+            ctx.save();
+            ctx.font = `bold ${Math.max(12, s * 0.14)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 6;
+            ctx.fillText(`Press  ${L.char}  on the keyboard!`, L.x, L.y + cardH / 2 * pulse + s * 0.08);
+            ctx.restore();
+        }
+
+        function handleLetterKey(char) {
+            if (state.mode !== 'letter' || !state.letter) return;
+            const upper = String(char).toUpperCase();
+            if (!/^[A-Z]$/.test(upper)) return;
+
+            if (upper === state.letter.char) {
+                // Same reward as hitting the circle: sticker + jackpot + running total
+                placeStamp(state.letter.x, state.letter.y, true);
+                awardReward();
+                spawnLetter();
+            } else {
+                state.letter.shakeUntil = performance.now() + 450;
+                playWrongKeyBuzz();
+            }
+            startAnimationLoop();
+        }
+
+        // --- REWARD HUD ---
+        function awardReward() {
+            state.rewards += 1;
+            updateRewardHud(true);
+        }
+
+        function updateRewardHud(pop = false) {
+            if (rewardTotal) {
+                rewardTotal.textContent = state.rewards;
+                if (pop) {
+                    rewardTotal.classList.remove('score-pop');
+                    void rewardTotal.offsetWidth;
+                    rewardTotal.classList.add('score-pop');
+                }
+            }
+            if (rewardLevel) rewardLevel.textContent = state.rewards + 1;
+        }
+
+        function lightJackpotLamp() {
+            if (!jackpotLamp) return;
+            jackpotLamp.classList.add('lit');
+            if (state.lampTimer) clearTimeout(state.lampTimer);
+            state.lampTimer = setTimeout(() => jackpotLamp.classList.remove('lit'), 2800);
+        }
+
+        function resetRewards() {
+            state.rewards = 0;
+            updateRewardHud();
+            if (state.mode === 'reward') spawnRewardTarget();
+            if (state.mode === 'letter') spawnLetter();
+            startAnimationLoop();
+        }
+
+        // --- MODE SWITCHING ---
+        function setMode(modeId) {
+            const def = GAME_MODES.find(m => m.id === modeId);
+            if (!def) return;
+            if (state.mode === 'drawing' && state.isDrawing) stopDrawing();
+
+            state.mode = modeId;
+            state.target = null;
+            state.letter = null;
+            if (modeId === 'reward') spawnRewardTarget();
+            if (modeId === 'letter') spawnLetter();
+
+            if (modeIcon) modeIcon.className = `fa-solid ${def.icon} text-lg`;
+            if (modeBadge) {
+                modeBadge.textContent = def.badge;
+                modeBadge.className = `absolute -top-1 -right-1 ${def.badgeClass} text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow`;
+            }
+            if (modeToggleBtn) modeToggleBtn.title = `${def.name} mode - tap to choose another mode`;
+
+            const showHud = modeId === 'reward' || modeId === 'letter';
+            if (rewardHud) rewardHud.classList.toggle('hidden', !showHud);
+            if (rewardHint) {
+                rewardHint.textContent = modeId === 'reward'
+                    ? 'Tap inside the moving circle to win!'
+                    : 'Press the big letter on your keyboard!';
+            }
+            updateRewardHud();
+            renderModeCards();
+            renderMainDock();
+            if (modeMenu) modeMenu.classList.add('hidden');
+
+            if (showHud) startAnimationLoop();
+            else if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        function renderModeCards() {
+            if (!modeCards) return;
+            modeCards.innerHTML = '';
+            GAME_MODES.forEach(m => {
+                const card = document.createElement('button');
+                card.className = `mode-card flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border border-gray-700/80 bg-gray-900/80 text-gray-200 ${
+                    m.id === state.mode ? 'active' : ''
+                }`;
+                card.title = m.desc;
+                card.innerHTML = `
+                    <i class="fa-solid ${m.icon} text-xl ${m.iconColor}"></i>
+                    <span class="text-xs font-bold">${m.name}</span>
+                    <span class="text-[9px] text-gray-400 leading-tight text-center">${m.desc}</span>
+                `;
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    setMode(m.id);
+                });
+                modeCards.appendChild(card);
+            });
+        }
+
         // --- UI DOCK BUILDER ---
         function renderMainDock() {
             if (!mainDock) return;
             mainDock.innerHTML = '';
 
-            if (state.mode === 'stickers') {
+            if (usesStickerDock()) {
                 STICKER_LIBRARY.forEach(sticker => {
                     const button = document.createElement('button');
                     button.className = `dock-card flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-gray-700/80 bg-gray-900/80 flex items-center justify-center p-1 relative ${
@@ -1206,7 +1658,7 @@
             if (!mainDock) return;
             const cards = mainDock.querySelectorAll('.dock-card');
             cards.forEach((card, index) => {
-                if (state.mode === 'stickers') {
+                if (usesStickerDock()) {
                     const sticker = STICKER_LIBRARY[index];
                     if (sticker && sticker.id === state.activeStickerId) card.classList.add('active');
                     else card.classList.remove('active');
@@ -1313,6 +1765,7 @@
         function triggerJackpotWin(x, y) {
             playCasinoJackpotTune();
             spawnJackpotParticles(x, y);
+            lightJackpotLamp();
 
             if (jackpotBanner) {
                 jackpotBanner.classList.remove('hidden');
@@ -1334,10 +1787,11 @@
         }
 
         // --- STAMPING & DRAWING INTERACTIONS ---
-        function placeStamp(x, y) {
+        // jackpot: null = random chance (classic sticker mode), true/false = decided by the game mode
+        function placeStamp(x, y, jackpot = null) {
             if (!state.isMusicPlaying) startToddlerMusic();
 
-            const isJackpotWin = Math.random() < 0.12;
+            const isJackpotWin = jackpot === null ? Math.random() < 0.12 : !!jackpot;
             const rotation = state.randomRotate ? (Math.random() * 0.5 - 0.25) : 0;
             
             const newStamp = {
@@ -1436,8 +1890,16 @@
                         state.cursorPos = { x: e.clientX, y: e.clientY };
                         if (state.mode === 'stickers') {
                             placeStamp(e.clientX, e.clientY);
-                        } else {
+                        } else if (state.mode === 'drawing') {
                             startDrawing(e.clientX, e.clientY);
+                        } else if (state.mode === 'reward') {
+                            handleRewardTap(e.clientX, e.clientY);
+                        } else if (state.mode === 'letter') {
+                            // Free stamping (no jackpot); also summon the keyboard on touch devices
+                            placeStamp(e.clientX, e.clientY, false);
+                            if (letterKeyInput) {
+                                try { letterKeyInput.focus({ preventScroll: true }); } catch (err) {}
+                            }
                         }
                     }
                 });
@@ -1466,23 +1928,46 @@
             if (modeToggleBtn) {
                 modeToggleBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (state.mode === 'stickers') {
-                        state.mode = 'drawing';
-                        if (modeIcon) modeIcon.className = "fa-solid fa-shapes text-lg";
-                        if (modeBadge) {
-                            modeBadge.textContent = "Stickers";
-                            modeBadge.className = "absolute -top-1 -right-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow";
-                        }
-                    } else {
-                        state.mode = 'stickers';
-                        if (modeIcon) modeIcon.className = "fa-solid fa-paintbrush text-lg";
-                        if (modeBadge) {
-                            modeBadge.textContent = "Draw";
-                            modeBadge.className = "absolute -top-1 -right-1 bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow";
-                        }
-                    }
-                    renderMainDock();
-                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                    if (modeMenu) modeMenu.classList.toggle('hidden');
+                    if (miniMenuDrawer) miniMenuDrawer.classList.add('hidden');
+                    if (colorPaletteMenu) colorPaletteMenu.classList.add('hidden');
+                });
+            }
+
+            if (closeModeMenuBtn) {
+                closeModeMenuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (modeMenu) modeMenu.classList.add('hidden');
+                });
+            }
+
+            if (rewardResetBtn) {
+                rewardResetBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    resetRewards();
+                });
+            }
+
+            // Letter mode: physical keyboards
+            window.addEventListener('keydown', (e) => {
+                if (state.mode !== 'letter') return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                const target = e.target;
+                const isOtherTextField = target && target !== letterKeyInput &&
+                    ((target.tagName === 'INPUT' && (target.type === 'text' || target.type === 'color')) || target.tagName === 'TEXTAREA');
+                if (isOtherTextField) return;
+                if (e.key && e.key.length === 1) {
+                    if (target === letterKeyInput) e.preventDefault(); // avoid a second 'input' event
+                    handleLetterKey(e.key);
+                }
+            });
+
+            // Letter mode: on-screen keyboards (keydown often reports 'Unidentified' there)
+            if (letterKeyInput) {
+                letterKeyInput.addEventListener('input', () => {
+                    const value = letterKeyInput.value;
+                    letterKeyInput.value = '';
+                    if (value) handleLetterKey(value[value.length - 1]);
                 });
             }
 
@@ -1520,6 +2005,7 @@
                     e.stopPropagation();
                     if (colorPaletteMenu) colorPaletteMenu.classList.toggle('hidden');
                     if (miniMenuDrawer) miniMenuDrawer.classList.add('hidden');
+                    if (modeMenu) modeMenu.classList.add('hidden');
                 });
             }
 
@@ -1534,6 +2020,7 @@
                     e.stopPropagation();
                     if (miniMenuDrawer) miniMenuDrawer.classList.toggle('hidden');
                     if (colorPaletteMenu) colorPaletteMenu.classList.add('hidden');
+                    if (modeMenu) modeMenu.classList.add('hidden');
                 });
             }
 
@@ -1549,6 +2036,9 @@
                 }
                 if (miniMenuDrawer && !miniMenuDrawer.contains(e.target) && miniMenuBtn && !miniMenuBtn.contains(e.target)) {
                     miniMenuDrawer.classList.add('hidden');
+                }
+                if (modeMenu && !modeMenu.contains(e.target) && modeToggleBtn && !modeToggleBtn.contains(e.target)) {
+                    modeMenu.classList.add('hidden');
                 }
             });
 
@@ -1631,6 +2121,17 @@
             modeToggleBtn = document.getElementById('modeToggleBtn');
             modeIcon = document.getElementById('modeIcon');
             modeBadge = document.getElementById('modeBadge');
+            modeMenu = document.getElementById('modeMenu');
+            modeCards = document.getElementById('modeCards');
+            closeModeMenuBtn = document.getElementById('closeModeMenuBtn');
+
+            rewardHud = document.getElementById('rewardHud');
+            rewardHint = document.getElementById('rewardHint');
+            jackpotLamp = document.getElementById('jackpotLamp');
+            rewardTotal = document.getElementById('rewardTotal');
+            rewardLevel = document.getElementById('rewardLevel');
+            rewardResetBtn = document.getElementById('rewardResetBtn');
+            letterKeyInput = document.getElementById('letterKeyInput');
 
             fullscreenToggleBtn = document.getElementById('fullscreenToggleBtn');
             fullscreenIcon = document.getElementById('fullscreenIcon');
@@ -1650,7 +2151,7 @@
             resizeCanvas();
             initColorPalette();
             setStyle('uv', '#FF007F', UV_SPLATTER_PRESETS[0]);
-            renderMainDock();
+            setMode('stickers');
             setupEventListeners();
             requestAnimationFrame(renderCanvas);
         }
