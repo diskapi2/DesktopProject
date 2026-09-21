@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Data Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        .chart-container {
+            position: relative;
+            height: 38vh;
+            width: 100%;
+        }
+        #debug-output, #raw-data-content, #help-content {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .loading-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="p-2 md:p-4 flex flex-col items-center min-h-screen">
+
+    <header class="w-full max-w-2xl mb-2 text-center">
+        <h1 class="text-lg font-bold text-blue-400">System Monitor</h1>
+        <div class="flex flex-col items-center gap-1 mt-1">
+            <div class="flex items-center justify-center gap-2">
+                <p id="status" class="text-[10px] text-slate-400">Initialising...</p>
+                <div class="flex flex-wrap justify-center gap-1">
+                    <button id="refresh-btn" onclick="fetchData()" class="text-[10px] bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-white font-bold transition-colors shadow-lg disabled:bg-slate-700">
+                        REFRESH
+                    </button>
+                    <button id="raw-btn" onclick="toggleRawModal(true)" class="text-[10px] bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-white font-bold transition-colors shadow-lg">
+                        RAW DATA
+                    </button>
+                    <button id="toggle-filter-btn" onclick="toggleTimeFilter()" class="text-[10px] bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded text-white font-bold transition-colors shadow-lg">
+                        FULL/PARTIAL
+                    </button>
+                </div>
+            </div>
+            <p id="network-log" class="text-[8px] text-slate-500 italic h-3"></p>
+        </div>
+    </header>
+
+    <main class="w-full max-w-2xl flex-grow flex flex-col gap-3">
+        <!-- Top Chart -->
+        <div class="bg-slate-800/50 rounded-xl p-3 shadow-lg border border-slate-700">
+            <h2 class="text-[10px] font-bold mb-1 text-slate-400 uppercase tracking-widest flex justify-between">
+                <span>ValL & ValS Trends (Inverted)</span>
+                <span id="view-mode-label" class="text-emerald-400 normal-case">Partial View</span>
+            </h2>
+            <div class="chart-container">
+                <canvas id="topChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Bottom Chart -->
+        <div class="bg-slate-800/50 rounded-xl p-3 shadow-lg border border-slate-700">
+            <h2 class="text-[10px] font-bold mb-1 text-slate-400 uppercase tracking-widest">Vix & Components</h2>
+            <div class="chart-container">
+                <canvas id="bottomChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Debug Section -->
+        <div class="bg-black/20 rounded-lg p-2 border border-slate-800/50">
+            <button onclick="document.getElementById('debug-log').classList.toggle('hidden')" class="text-[9px] text-slate-600 underline">
+                Debug Info
+            </button>
+            <div id="debug-log" class="hidden mt-2">
+                <div id="debug-output" class="text-[9px] text-slate-500 max-h-32 overflow-y-auto">No data.</div>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-center pb-4">
+            <button onclick="toggleHelpModal(true)" class="text-[10px] bg-slate-800 hover:bg-slate-700 px-6 py-2 rounded-full text-slate-400 font-bold border border-slate-700 transition-all shadow-md">
+                HELP
+            </button>
+        </div>
+    </main>
+
+    <!-- Raw Data Modal -->
+    <div id="raw-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-blue-400">Raw Data Log (Latest First)</h3>
+                <button onclick="toggleRawModal(false)" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto bg-black/40">
+                <div id="raw-data-content" class="text-[10px] text-slate-300 leading-relaxed">No data synced yet.</div>
+            </div>
+            <div class="p-3 border-t border-slate-800 text-right">
+                <button onclick="toggleRawModal(false)" class="text-[10px] bg-slate-700 px-4 py-2 rounded text-white font-bold">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl shadow-2xl flex flex-col">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-emerald-400">Help & Instructions</h3>
+                <button onclick="toggleHelpModal(false)" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div class="p-6 bg-black/40">
+                <p id="help-content" class="text-xs text-slate-300 leading-relaxed">
+This app retrieves data from goolge drive called monitor.txt. But to retrieve that a self hosted proxy has to be created at cloudflare.com. Login using google account diskapi2 at <a href="https://workers.cloudflare.com/" target="_blank" class="text-blue-400 hover:underline">https://workers.cloudflare.com/</a> 
+On the left menu click Compute then workers/pages and flat-half-df36 is the worker app.
+                </p>
+            </div>
+            <div class="p-3 border-t border-slate-800 text-right">
+                <button onclick="toggleHelpModal(false)" class="text-[10px] bg-slate-700 px-4 py-2 rounded text-white font-bold">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const FILE_ID  = '1G6JMyxz_q8R7W4X9A4fQklTPGc9MQ0Q7';
+        const WORKER_URL = 'https://flat-hall-df36.diskapi2.workers.dev/';
+
+        let lastRawContent = "";
+        let topChartInstance = null;
+        let bottomChartInstance = null;
+        let isSyncing = false;
+        let isTimeFiltered = true;
+
+        function timeToSeconds(t) {
+            if (!t || typeof t !== 'string') return null;
+            const parts = t.split(':');
+            if (parts.length < 2) return null;
+            return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + (parseInt(parts[2]) || 0);
+        }
+
+        const verticalLinePlugin = {
+            id: 'verticalLine',
+            afterDraw: (chart) => {
+                const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+                const labels = chart.data.labels;
+                if (!labels || labels.length < 2) return;
+                const markers = [
+                    { label: '9:30 AM', seconds: 9 * 3600 + 30 * 60 },
+                    { label: '4:00 PM', seconds: 16 * 3600 }
+                ];
+                markers.forEach(marker => {
+                    let leftIdx = -1; let rightIdx = -1;
+                    for (let i = 0; i < labels.length - 1; i++) {
+                        const s1 = timeToSeconds(labels[i]);
+                        const s2 = timeToSeconds(labels[i+1]);
+                        if (s1 <= marker.seconds && s2 >= marker.seconds) {
+                            leftIdx = i; rightIdx = i+1; break;
+                        }
+                    }
+                    if (leftIdx !== -1) {
+                        const s1 = timeToSeconds(labels[leftIdx]); const s2 = timeToSeconds(labels[rightIdx]);
+                        const p1 = x.getPixelForValue(labels[leftIdx]); const p2 = x.getPixelForValue(labels[rightIdx]);
+                        let xPos = (s1 === s2) ? p1 : p1 + (p2 - p1) * ((marker.seconds - s1) / (s2 - s1));
+                        ctx.save(); ctx.beginPath(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1;
+                        ctx.setLineDash([5, 5]); ctx.moveTo(xPos, top); ctx.lineTo(xPos, bottom); ctx.stroke();
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'; ctx.font = '9px sans-serif';
+                        ctx.fillText(marker.label, xPos + 5, top + 15); ctx.restore();
+                    }
+                });
+            }
+        };
+
+        Chart.register(verticalLinePlugin);
+
+        function toggleTimeFilter() {
+            isTimeFiltered = !isTimeFiltered;
+            document.getElementById('view-mode-label').innerText = isTimeFiltered ? "Partial View" : "Full View";
+            if (lastRawContent) processData(lastRawContent);
+        }
+
+        async function fetchData() {
+            const statusEl = document.getElementById('status');
+            const networkLog = document.getElementById('network-log');
+            const btn = document.getElementById('refresh-btn');
+            
+            btn.disabled = true;
+            statusEl.innerText = "Syncing...";
+            statusEl.classList.add('loading-pulse');
+
+            const url = `${WORKER_URL}?fileId=${FILE_ID}&nocache=${Date.now()}`;
+            
+            console.log(`Operation: Fetching via Cloudflare Worker... URL: ${url}`);
+            networkLog.innerText = `Fetching via Worker...`;
+
+            try {
+                const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const content = await response.text();
+                
+                if (content && content.length > 20 && processData(content)) {
+                    lastRawContent = content;
+                    statusEl.innerText = 'Updated: ' + new Date().toLocaleTimeString();
+                    statusEl.className = "text-[10px] text-green-400";
+                    networkLog.innerText = `Connected via Cloudflare Worker`;
+                    document.getElementById('debug-output').innerText = content.substring(0, 300);
+                } else {
+                    throw new Error("Invalid data format received");
+                }
+            } catch (e) {
+                console.error(`Operation: Worker fetch failed:`, e.message);
+                statusEl.innerText = "Sync Failed";
+                statusEl.className = "text-rose-400";
+                networkLog.innerText = `Worker Error: ${e.message}`;
+            } finally {
+                btn.disabled = false;
+                statusEl.classList.remove('loading-pulse');
+            }
+        }
+
+        function processData(rawText) {
+            const lines = rawText.split(/[\r\n]+/).map(l => l.trim()).filter(l => l.length > 20);
+            if (lines.length === 0) return false;
+            const parsedData = lines.map((line, idx) => {
+                const timeMatch = line.match(/(\d{2}:\d{2}:\d{2})/);
+                const time = timeMatch ? timeMatch[1] : `P${idx}`;
+                const record = { time };
+                const regex = /([a-zA-Z]+)\s*[:\s]+\s*(-?[\d.]+)/g;
+                let match;
+                while ((match = regex.exec(line)) !== null) record[match[1]] = parseFloat(match[2]);
+                return record;
+            });
+
+            let validData = parsedData.filter(d => d.ValL !== undefined || d.Vix !== undefined);
+            
+            if (isTimeFiltered) {
+                try {
+                    const etNowStr = new Date().toLocaleString("en-US", {timeZone: "America/New_York", hour12: false});
+                    const etHour = parseInt(etNowStr.split(', ')[1].split(':')[0]);
+                    if (etHour >= 11) validData = validData.filter(d => d.time >= "09:00:00");
+                } catch (e) { }
+            }
+
+            const foundKeys = [];
+            const keyRegex = /([a-zA-Z]+)\s*[:\s]/g;
+            let keyMatch;
+            while ((keyMatch = keyRegex.exec(lines[0])) !== null) foundKeys.push(keyMatch[1]);
+            const vixIdx = foundKeys.indexOf('Vix');
+            const bottomKeys = vixIdx !== -1 ? foundKeys.slice(vixIdx, foundKeys.indexOf('Rec') !== -1 ? foundKeys.indexOf('Rec') : foundKeys.length) : ['Vix'];
+
+            renderCharts(validData, bottomKeys);
+            return true;
+        }
+
+        function renderCharts(data, bottomKeys) {
+            if (topChartInstance) topChartInstance.destroy();
+            if (bottomChartInstance) bottomChartInstance.destroy();
+            const labels = data.map(d => d.time);
+            
+            const syncTooltips = (event, activeElements, chart) => {
+                if (isSyncing || !topChartInstance || !bottomChartInstance) return;
+                isSyncing = true;
+                const otherChart = chart === topChartInstance ? bottomChartInstance : topChartInstance;
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const meta = otherChart.getDatasetMeta(0);
+                    if (meta.data[index]) {
+                        const point = meta.data[index];
+                        otherChart.setActiveElements([{ datasetIndex: 0, index }]);
+                        otherChart.tooltip.setActiveElements([{ datasetIndex: 0, index }], { x: point.x, y: point.y });
+                    }
+                } else {
+                    otherChart.setActiveElements([]);
+                    otherChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                }
+                otherChart.update('none'); 
+                isSyncing = false;
+            };
+
+            const commonOptions = {
+                responsive: true, maintainAspectRatio: false, animation: false, onHover: syncTooltips,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', align: 'start', labels: { color: '#94a3b8', boxWidth: 8, font: { size: 9 }, usePointStyle: true } },
+                    tooltip: { mode: 'index', intersect: false, backgroundColor: '#1e293b' }
+                },
+                scales: {
+                    x: { ticks: { color: '#64748b', font: { size: 8 }, maxTicksLimit: 6 }, grid: { display: false } },
+                    y: { ticks: { color: '#64748b', font: { size: 8 } }, grid: { color: '#1e293b' } }
+                }
+            };
+
+            topChartInstance = new Chart(document.getElementById('topChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'ValL', data: data.map(d => d.ValL), borderColor: '#60a5fa', borderWidth: 1.5, pointRadius: 0, tension: 0.1 },
+                        { label: 'ValS', data: data.map(d => d.ValS), borderColor: '#fb7185', borderWidth: 1.5, pointRadius: 0, tension: 0.1 }
+                    ]
+                },
+                options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, reverse: true } } }
+            });
+
+            bottomChartInstance = new Chart(document.getElementById('bottomChart'), {
+                type: 'line',
+                data: { labels, datasets: bottomKeys.map((key, i) => ({ label: key, data: data.map(d => d[key]), borderColor: ['#818cf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#2dd4bf', '#fb923c', '#94a3b8'][i % 8], borderWidth: 1.2, pointRadius: 0, tension: 0.1 })) },
+                options: commonOptions
+            });
+        }
+
+        function toggleRawModal(show) {
+            const modal = document.getElementById('raw-modal');
+            const content = document.getElementById('raw-data-content');
+            if (show) {
+                const lines = lastRawContent.split(/[\r\n]+/).filter(l => l.trim().length > 0);
+                content.innerText = [...lines].reverse().join('\n');
+                modal.classList.remove('hidden');
+            } else modal.classList.add('hidden');
+        }
+
+        function toggleHelpModal(show) {
+            const modal = document.getElementById('help-modal');
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        window.onload = fetchData;
+    </script>
+</body>
+</html>
