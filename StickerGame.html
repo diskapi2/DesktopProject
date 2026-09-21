@@ -547,9 +547,43 @@
             { id: 'stickers', name: 'Stickers', icon: 'fa-shapes', iconColor: 'text-pink-400', badge: 'Stickers', badgeClass: 'bg-pink-500 text-white', desc: 'Tap to stamp stickers' },
             { id: 'drawing', name: 'Draw', icon: 'fa-paintbrush', iconColor: 'text-amber-400', badge: 'Draw', badgeClass: 'bg-amber-400 text-black', desc: 'Neon pens & sprays' },
             { id: 'reward', name: 'Reward', icon: 'fa-bullseye', iconColor: 'text-emerald-400', badge: 'Reward', badgeClass: 'bg-emerald-400 text-black', desc: 'Catch the moving circle' },
-            { id: 'letter', name: 'Letter', icon: 'fa-font', iconColor: 'text-sky-400', badge: 'Letter', badgeClass: 'bg-sky-400 text-black', desc: 'Press the big letter' }
+            { id: 'letter', name: 'Letter', icon: 'fa-font', iconColor: 'text-sky-400', badge: 'Letter', badgeClass: 'bg-sky-400 text-black', desc: 'Press the big letter' },
+            { id: 'lettersound', name: 'Letter Sound', icon: 'fa-volume-high', iconColor: 'text-violet-400', badge: 'Sound', badgeClass: 'bg-violet-400 text-black', desc: 'Hear it, press the letter' }
         ];
-        const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+        // Phonics bank: the letter is spoken as "A, as in Apple" and pictured by its emoji.
+        const PHONICS = [
+            { char: 'A', word: 'Apple', emoji: '\u{1F34E}' },
+            { char: 'B', word: 'Ball', emoji: '\u{26BD}' },
+            { char: 'C', word: 'Cat', emoji: '\u{1F431}' },
+            { char: 'D', word: 'Dog', emoji: '\u{1F436}' },
+            { char: 'E', word: 'Elephant', emoji: '\u{1F418}' },
+            { char: 'F', word: 'Fish', emoji: '\u{1F41F}' },
+            { char: 'G', word: 'Goat', emoji: '\u{1F410}' },
+            { char: 'H', word: 'Hat', emoji: '\u{1F452}' },
+            { char: 'I', word: 'Ice cream', emoji: '\u{1F366}' },
+            { char: 'J', word: 'Juice', emoji: '\u{1F9C3}' },
+            { char: 'K', word: 'Kite', emoji: '\u{1FA81}' },
+            { char: 'L', word: 'Lion', emoji: '\u{1F981}' },
+            { char: 'M', word: 'Moon', emoji: '\u{1F319}' },
+            { char: 'N', word: 'Nest', emoji: '\u{1FAB9}' },
+            { char: 'O', word: 'Orange', emoji: '\u{1F34A}' },
+            { char: 'P', word: 'Pig', emoji: '\u{1F437}' },
+            { char: 'Q', word: 'Queen', emoji: '\u{1F451}' },
+            { char: 'R', word: 'Rainbow', emoji: '\u{1F308}' },
+            { char: 'S', word: 'Sun', emoji: '\u{2600}\u{FE0F}' },
+            { char: 'T', word: 'Tree', emoji: '\u{1F333}' },
+            { char: 'U', word: 'Umbrella', emoji: '\u{2602}\u{FE0F}' },
+            { char: 'V', word: 'Van', emoji: '\u{1F690}' },
+            { char: 'W', word: 'Whale', emoji: '\u{1F433}' },
+            { char: 'X', word: 'Xylophone', emoji: '\u{1F3B6}' },
+            { char: 'Y', word: 'Yo-yo', emoji: '\u{1FA80}' },
+            { char: 'Z', word: 'Zebra', emoji: '\u{1F993}' }
+        ];
+
+        // How many wrong keys in a row before the prompt is spoken again
+        const REPEAT_AFTER_WRONG = 5;
+        const EMOJI_FONT = '"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Twemoji Mozilla", system-ui, sans-serif';
 
         // Background Presets
         const BACKGROUND_PRESETS = [
@@ -609,12 +643,19 @@
             // Reward / Letter game state
             rewards: 0,
             target: null,      // moving reward circle { x, y, r, vx, vy }
-            letter: null,      // letter challenge { char, x, y, shakeUntil }
-            lampTimer: null
+            letter: null,      // letter challenge { char, word, emoji, x, y, shakeUntil, wrongCount }
+            lampTimer: null,
+            isSpeaking: false,
+            speakTimer: null
         };
 
         function usesStickerDock() {
-            return state.mode === 'stickers' || state.mode === 'reward' || state.mode === 'letter';
+            return state.mode === 'stickers' || state.mode === 'reward' || isLetterMode();
+        }
+
+        // Both keyboard challenges: 'letter' shows the letter, 'lettersound' speaks it instead
+        function isLetterMode() {
+            return state.mode === 'letter' || state.mode === 'lettersound';
         }
 
         // Highly Optimized Caching for Patterns (Prevents GC Stuttering & Freezing)
@@ -758,6 +799,7 @@
             musicStep = 0;
             musicTimer = setInterval(() => {
                 if (!state.isMusicPlaying) return;
+                if (state.isSpeaking) return; // stay quiet while a letter is spoken
                 const note = TODDLER_TUNE[musicStep % TODDLER_TUNE.length];
                 playPluckNote(note.freq, false);
                 if (musicStep % 2 === 0) playPluckNote(note.bass, true);
@@ -858,6 +900,78 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.25);
             } catch (e) {}
+        }
+
+        // --- SPEECH: "A, as in Apple" ---
+        function speechAvailable() {
+            return typeof window !== 'undefined' &&
+                   'speechSynthesis' in window &&
+                   typeof window.SpeechSynthesisUtterance === 'function';
+        }
+
+        function pickSpeechVoice() {
+            try {
+                const voices = window.speechSynthesis.getVoices() || [];
+                if (!voices.length) return null;
+                const english = voices.filter(v => /^en/i.test(v.lang || ''));
+                const pool = english.length ? english : voices;
+                return pool.find(v => /samantha|karen|moira|female|google us english|zira/i.test(v.name || '')) ||
+                       pool.find(v => /^en[-_]us/i.test(v.lang || '')) ||
+                       pool[0];
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function cancelSpeech() {
+            state.isSpeaking = false;
+            if (state.speakTimer) {
+                clearTimeout(state.speakTimer);
+                state.speakTimer = null;
+            }
+            if (speechAvailable()) {
+                try { window.speechSynthesis.cancel(); } catch (e) {}
+            }
+        }
+
+        // Speaks the current prompt. Returns false when the browser has no speech support.
+        function speakLetterPrompt() {
+            const L = state.letter;
+            if (!L) return false;
+            if (!speechAvailable()) return false;
+
+            try {
+                window.speechSynthesis.cancel();
+                const utterance = new window.SpeechSynthesisUtterance(`${L.char}, as in ${L.word}`);
+                utterance.rate = 0.7;
+                utterance.pitch = 1.2;
+                utterance.volume = 1;
+
+                const voice = pickSpeechVoice();
+                if (voice) utterance.voice = voice;
+
+                const done = () => {
+                    state.isSpeaking = false;
+                    if (state.speakTimer) {
+                        clearTimeout(state.speakTimer);
+                        state.speakTimer = null;
+                    }
+                };
+                utterance.onend = done;
+                utterance.onerror = done;
+
+                state.isSpeaking = true;
+                if (state.speakTimer) clearTimeout(state.speakTimer);
+                // Safety net: some browsers never fire onend
+                state.speakTimer = setTimeout(done, 4000);
+
+                window.speechSynthesis.speak(utterance);
+                startAnimationLoop();
+                return true;
+            } catch (e) {
+                state.isSpeaking = false;
+                return false;
+            }
         }
 
         function playCasinoJackpotTune() {
@@ -1234,6 +1348,7 @@
             // Render Reward Target / Letter Challenge
             if (state.mode === 'reward' && state.target) drawRewardTarget(now);
             if (state.mode === 'letter' && state.letter) drawLetterChallenge(now);
+            if (state.mode === 'lettersound' && state.letter) drawSoundChallenge(now);
 
             // Render Cursor Preview
             if (state.isMouseOnCanvas && usesStickerDock() && !state.isDrawing) {
@@ -1253,7 +1368,7 @@
             return state.particles.length > 0 ||
                    state.activeAnimations.length > 0 ||
                    state.mode === 'reward' ||
-                   state.mode === 'letter';
+                   isLetterMode();
         }
 
         function startAnimationLoop() {
@@ -1345,7 +1460,7 @@
                 t.y = Math.min(b.maxY, Math.max(b.minY, t.y));
             }
             if (state.letter) {
-                const b = safeBounds(letterSize() * 0.7);
+                const b = safeBounds(letterSize() * 0.8);
                 state.letter.x = Math.min(b.maxX, Math.max(b.minX, state.letter.x));
                 state.letter.y = Math.min(b.maxY, Math.max(b.minY, state.letter.y));
             }
@@ -1413,17 +1528,21 @@
         }
 
         function spawnLetter() {
-            let char;
+            let entry;
             do {
-                char = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-            } while (state.letter && char === state.letter.char);
+                entry = PHONICS[Math.floor(Math.random() * PHONICS.length)];
+            } while (state.letter && entry.char === state.letter.char && PHONICS.length > 1);
 
-            const b = safeBounds(letterSize() * 0.7);
+            const b = safeBounds(letterSize() * 0.8);
             state.letter = {
-                char,
+                char: entry.char,
+                word: entry.word,
+                emoji: entry.emoji,
                 x: randomBetween(b.minX, b.maxX),
                 y: randomBetween(b.minY, b.maxY),
-                shakeUntil: 0
+                shakeUntil: 0,
+                wrongCount: 0,
+                reveal: false
             };
         }
 
@@ -1492,19 +1611,121 @@
             ctx.restore();
         }
 
+        // --- LETTER SOUND MODE: THE LETTER IS SPOKEN, NEVER SHOWN ---
+        function soundCardMetrics() {
+            const s = letterSize();
+            return { s, cardW: s * 1.5, cardH: s * 1.35 };
+        }
+
+        function pointInSoundCard(px, py) {
+            if (!state.letter) return false;
+            const { cardW, cardH } = soundCardMetrics();
+            return Math.abs(px - state.letter.x) <= cardW / 2 &&
+                   Math.abs(py - state.letter.y) <= cardH / 2;
+        }
+
+        function drawSpeakerGlyph(context, r, litWaves) {
+            context.beginPath();
+            context.moveTo(-r * 0.95, -r * 0.34);
+            context.lineTo(-r * 0.38, -r * 0.34);
+            context.lineTo(r * 0.05, -r * 0.88);
+            context.lineTo(r * 0.05, r * 0.88);
+            context.lineTo(-r * 0.38, r * 0.34);
+            context.lineTo(-r * 0.95, r * 0.34);
+            context.closePath();
+            context.fill();
+
+            context.lineWidth = Math.max(2, r * 0.17);
+            context.lineCap = 'round';
+            for (let i = 0; i < 3; i++) {
+                context.globalAlpha = i < litWaves ? 1 : 0.22;
+                context.beginPath();
+                context.arc(r * 0.15, 0, r * (0.48 + i * 0.34), -Math.PI / 3, Math.PI / 3);
+                context.stroke();
+            }
+            context.globalAlpha = 1;
+        }
+
+        function drawSoundChallenge(now) {
+            const L = state.letter;
+            const { s, cardW, cardH } = soundCardMetrics();
+            const pulse = 1 + Math.sin(now / 220) * 0.05;
+            const shake = now < L.shakeUntil ? Math.sin(now / 18) * s * 0.06 : 0;
+            const glow = activeGlowColor();
+            const speaking = state.isSpeaking;
+            const accent = shake ? '#FF4757' : (speaking ? '#00FFCC' : '#FFD700');
+
+            ctx.save();
+            ctx.translate(L.x + shake, L.y);
+            ctx.scale(pulse, pulse);
+
+            traceRoundedRect(ctx, -cardW / 2, -cardH / 2, cardW, cardH, s * 0.2);
+            ctx.fillStyle = 'rgba(10, 10, 22, 0.78)';
+            ctx.fill();
+            ctx.lineWidth = Math.max(3, s * 0.05);
+            ctx.strokeStyle = accent;
+            ctx.shadowColor = shake ? '#FF4757' : (speaking ? '#00FFCC' : glow);
+            ctx.shadowBlur = speaking ? 45 : 28;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Picture cue for the word. The letter itself is deliberately not drawn.
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `${Math.round(s * 0.58)}px ${EMOJI_FONT}`;
+            ctx.fillText(L.emoji, 0, -s * 0.16);
+
+            ctx.save();
+            ctx.translate(0, cardH / 2 - s * 0.26);
+            ctx.fillStyle = accent;
+            ctx.strokeStyle = accent;
+            drawSpeakerGlyph(ctx, s * 0.15, speaking ? (Math.floor(now / 200) % 4) : 3);
+            ctx.restore();
+
+            // Only shown when the browser cannot speak at all
+            if (L.reveal) {
+                ctx.font = `900 ${Math.round(s * 0.3)}px system-ui, sans-serif`;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillText(L.char, 0, -cardH / 2 + s * 0.24);
+            }
+            ctx.restore();
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 6;
+            ctx.font = `bold ${Math.max(12, Math.round(s * 0.14))}px system-ui, sans-serif`;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText('Which letter did you hear?', L.x, L.y + (cardH / 2) * pulse + s * 0.08);
+            ctx.font = `bold ${Math.max(10, Math.round(s * 0.1))}px system-ui, sans-serif`;
+            ctx.fillStyle = '#C9C9DD';
+            ctx.fillText('Tap the card to hear it again', L.x, L.y + (cardH / 2) * pulse + s * 0.26);
+            ctx.restore();
+        }
+
         function handleLetterKey(char) {
-            if (state.mode !== 'letter' || !state.letter) return;
+            if (!isLetterMode() || !state.letter) return;
             const upper = String(char).toUpperCase();
             if (!/^[A-Z]$/.test(upper)) return;
 
-            if (upper === state.letter.char) {
+            const L = state.letter;
+            if (upper === L.char) {
                 // Same reward as hitting the circle: sticker + jackpot + running total
-                placeStamp(state.letter.x, state.letter.y, true);
+                placeStamp(L.x, L.y, true);
                 awardReward();
                 spawnLetter();
+                if (state.mode === 'lettersound') speakLetterPrompt();
             } else {
-                state.letter.shakeUntil = performance.now() + 450;
+                L.wrongCount = (L.wrongCount || 0) + 1;
+                L.shakeUntil = performance.now() + 450;
                 playWrongKeyBuzz();
+                // Say the letter again once the child has missed REPEAT_AFTER_WRONG times
+                if (state.mode === 'lettersound' && L.wrongCount % REPEAT_AFTER_WRONG === 0) {
+                    setTimeout(() => {
+                        if (state.mode === 'lettersound' && state.letter === L) speakLetterPrompt();
+                    }, 420);
+                }
             }
             startAnimationLoop();
         }
@@ -1538,7 +1759,10 @@
             state.rewards = 0;
             updateRewardHud();
             if (state.mode === 'reward') spawnRewardTarget();
-            if (state.mode === 'letter') spawnLetter();
+            if (isLetterMode()) {
+                spawnLetter();
+                if (state.mode === 'lettersound') speakLetterPrompt();
+            }
             startAnimationLoop();
         }
 
@@ -1547,12 +1771,13 @@
             const def = GAME_MODES.find(m => m.id === modeId);
             if (!def) return;
             if (state.mode === 'drawing' && state.isDrawing) stopDrawing();
+            cancelSpeech();
 
             state.mode = modeId;
             state.target = null;
             state.letter = null;
             if (modeId === 'reward') spawnRewardTarget();
-            if (modeId === 'letter') spawnLetter();
+            if (isLetterMode()) spawnLetter();
 
             if (modeIcon) modeIcon.className = `fa-solid ${def.icon} text-lg`;
             if (modeBadge) {
@@ -1561,17 +1786,23 @@
             }
             if (modeToggleBtn) modeToggleBtn.title = `${def.name} mode - tap to choose another mode`;
 
-            const showHud = modeId === 'reward' || modeId === 'letter';
+            const showHud = modeId === 'reward' || isLetterMode();
             if (rewardHud) rewardHud.classList.toggle('hidden', !showHud);
             if (rewardHint) {
-                rewardHint.textContent = modeId === 'reward'
-                    ? 'Tap inside the moving circle to win!'
-                    : 'Press the big letter on your keyboard!';
+                if (modeId === 'reward') rewardHint.textContent = 'Tap inside the moving circle to win!';
+                else if (modeId === 'letter') rewardHint.textContent = 'Press the big letter on your keyboard!';
+                else if (modeId === 'lettersound') rewardHint.textContent = 'Listen, then press the letter you hear!';
             }
             updateRewardHud();
             renderModeCards();
             renderMainDock();
             if (modeMenu) modeMenu.classList.add('hidden');
+
+            // Entering this mode always comes from a tap, so speech is allowed to start here
+            if (modeId === 'lettersound' && !speakLetterPrompt()) {
+                if (state.letter) state.letter.reveal = true;
+                showToast('This browser cannot speak; showing the letter instead.');
+            }
 
             if (showHud) startAnimationLoop();
             else if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
@@ -1580,11 +1811,12 @@
         function renderModeCards() {
             if (!modeCards) return;
             modeCards.innerHTML = '';
-            GAME_MODES.forEach(m => {
+            GAME_MODES.forEach((m, idx) => {
                 const card = document.createElement('button');
+                const isLoneLast = (idx === GAME_MODES.length - 1) && (GAME_MODES.length % 2 === 1);
                 card.className = `mode-card flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border border-gray-700/80 bg-gray-900/80 text-gray-200 ${
-                    m.id === state.mode ? 'active' : ''
-                }`;
+                    isLoneLast ? 'col-span-2' : ''
+                } ${m.id === state.mode ? 'active' : ''}`;
                 card.title = m.desc;
                 card.innerHTML = `
                     <i class="fa-solid ${m.icon} text-xl ${m.iconColor}"></i>
@@ -1789,7 +2021,8 @@
         // --- STAMPING & DRAWING INTERACTIONS ---
         // jackpot: null = random chance (classic sticker mode), true/false = decided by the game mode
         function placeStamp(x, y, jackpot = null) {
-            if (!state.isMusicPlaying) startToddlerMusic();
+            // Letter Sound mode stays quiet so the spoken letter is easy to hear
+            if (!state.isMusicPlaying && state.mode !== 'lettersound') startToddlerMusic();
 
             const isJackpotWin = jackpot === null ? Math.random() < 0.12 : !!jackpot;
             const rotation = state.randomRotate ? (Math.random() * 0.5 - 0.25) : 0;
@@ -1894,9 +2127,14 @@
                             startDrawing(e.clientX, e.clientY);
                         } else if (state.mode === 'reward') {
                             handleRewardTap(e.clientX, e.clientY);
-                        } else if (state.mode === 'letter') {
-                            // Free stamping (no jackpot); also summon the keyboard on touch devices
-                            placeStamp(e.clientX, e.clientY, false);
+                        } else if (isLetterMode()) {
+                            // Tapping the sound card replays the prompt; anywhere else just stamps
+                            if (state.mode === 'lettersound' && pointInSoundCard(e.clientX, e.clientY)) {
+                                speakLetterPrompt();
+                            } else {
+                                placeStamp(e.clientX, e.clientY, false);
+                            }
+                            // Summons the on-screen keyboard on touch devices
                             if (letterKeyInput) {
                                 try { letterKeyInput.focus({ preventScroll: true }); } catch (err) {}
                             }
@@ -1950,7 +2188,7 @@
 
             // Letter mode: physical keyboards
             window.addEventListener('keydown', (e) => {
-                if (state.mode !== 'letter') return;
+                if (!isLetterMode()) return;
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
                 const target = e.target;
                 const isOtherTextField = target && target !== letterKeyInput &&
