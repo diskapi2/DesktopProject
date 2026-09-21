@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sticker Studio Game</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom Styles & Utilities */
+        body {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0d0d1a;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        /* Custom scrollbars for dock & menus */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphic UI overlays */
+        .glass-panel {
+            background: rgba(18, 18, 35, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #ffffff;
+        }
+
+        .dock-card {
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+        }
+        .dock-card:hover {
+            transform: translateY(-4px) scale(1.08);
+        }
+        .dock-card:active {
+            transform: scale(0.92);
+        }
+        .dock-card.active {
+            border-color: #ff007f;
+            background-color: rgba(255, 0, 127, 0.22);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.5);
+        }
+
+        /* Pulse animation for active color */
+        @keyframes ringPulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(255, 0, 127, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0); }
+        }
+        .color-badge-pulse {
+            animation: ringPulse 2s infinite;
+        }
+
+        /* Music note float animation */
+        @keyframes noteFloat {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-3px) rotate(8deg); }
+        }
+        .music-playing {
+            animation: noteFloat 1.2s ease-in-out infinite;
+            color: #ff007f !important;
+            border-color: rgba(255, 0, 127, 0.5) !important;
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.4);
+        }
+
+        /* Glitter & UV Swatch Effects */
+        .glitter-swatch {
+            background-image: radial-gradient(circle, rgba(255,255,255,0.9) 15%, transparent 20%), 
+                              radial-gradient(circle, rgba(255,255,255,0.7) 15%, transparent 20%);
+            background-size: 8px 8px, 6px 6px;
+            background-position: 0 0, 3px 3px;
+        }
+
+        .uv-splatter-swatch {
+            background-image: 
+                radial-gradient(circle, #00ffcc 25%, transparent 26%),
+                radial-gradient(circle, #ff007f 20%, transparent 21%),
+                radial-gradient(circle, #cc00ff 30%, transparent 31%);
+            background-size: 10px 10px, 8px 8px, 12px 12px;
+            background-position: 0 0, 4px 4px, 2px 6px;
+        }
+
+        /* LAS VEGAS JACKPOT ANIMATION STYLES */
+        @keyframes vegasGlow {
+            0% { transform: translate(-50%, -100px) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, 0) scale(1.1); opacity: 1; }
+            30% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+            80% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -40px) scale(0.8); opacity: 0; }
+        }
+
+        @keyframes casinoBorderFlash {
+            0%, 100% { border-color: #ffd700; box-shadow: 0 0 25px #ffd700; }
+            50% { border-color: #ff007f; box-shadow: 0 0 35px #ff007f, inset 0 0 15px #ffd700; }
+        }
+
+        .jackpot-banner-anim {
+            animation: vegasGlow 2.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .casino-border-glow {
+            animation: casinoBorderFlash 0.3s infinite;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative overflow-hidden select-none">
+
+    <!-- Screen Flash Effect on Jackpot -->
+    <div id="jackpotFlashOverlay" class="pointer-events-none absolute inset-0 z-10 transition-opacity duration-300 opacity-0 bg-amber-400/20 border-[8px] border-amber-400"></div>
+
+    <!-- Canvas Surface -->
+    <canvas id="stickerCanvas" class="w-full h-full absolute inset-0 cursor-crosshair z-0 touch-none"></canvas>
+
+    <!-- LAS VEGAS JACKPOT BANNER -->
+    <div id="jackpotBanner" class="hidden absolute top-6 left-1/2 z-30 pointer-events-none">
+        <div class="glass-panel px-6 py-3 rounded-3xl border-4 border-amber-400 casino-border-glow shadow-[0_0_50px_rgba(255,215,0,0.8)] flex flex-col items-center justify-center bg-gradient-to-r from-amber-950/90 via-purple-950/90 to-amber-950/90">
+            <div class="flex items-center gap-2 text-2xl sm:text-3xl font-black text-amber-300 tracking-wider drop-shadow-[0_2px_10px_rgba(255,215,0,1)] uppercase">
+                <span>🎰</span>
+                <span class="bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-100 bg-clip-text text-transparent">WINNER! JACKPOT!</span>
+                <span>🎰</span>
+            </div>
+            <div class="text-xs sm:text-sm font-bold text-pink-300 tracking-widest uppercase flex items-center gap-2 mt-0.5">
+                <span>✨ 777 BIG LAS VEGAS WIN! ✨</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOP RIGHT: Controls Container -->
+    <div class="absolute top-4 right-4 z-20 flex gap-3 pointer-events-none">
+        <!-- Fullscreen Toggle Button -->
+        <button id="fullscreenToggleBtn" title="Toggle Fullscreen" class="w-12 h-12 rounded-2xl glass-panel shadow-lg flex items-center justify-center text-gray-300 hover:text-pink-400 hover:scale-105 active:scale-95 transition-all border border-white/20 pointer-events-auto">
+            <i id="fullscreenIcon" class="fa-solid fa-expand text-lg"></i>
+        </button>
+        
+        <!-- Music Toggle Button -->
+        <button id="musicToggleBtn" title="Toggle Music" class="w-12 h-12 rounded-2xl glass-panel shadow-lg flex items-center justify-center text-gray-300 hover:text-pink-400 hover:scale-105 active:scale-95 transition-all border border-white/20 pointer-events-auto">
+            <i id="musicIcon" class="fa-solid fa-music-slash text-lg"></i>
+        </button>
+    </div>
+
+    <!-- BOTTOM TOOLBAR AREA -->
+    <div class="absolute bottom-0 left-0 right-0 z-20 p-3 sm:p-4 flex items-end justify-between gap-2 pointer-events-none">
+        
+        <!-- BOTTOM LEFT: Mini Menu & Mode Switcher Circle Container -->
+        <div class="relative pointer-events-auto flex items-center gap-2">
+            
+            <!-- Mini Menu Toggle Button -->
+            <button id="miniMenuBtn" class="w-12 h-12 rounded-2xl glass-panel shadow-lg flex items-center justify-center text-gray-200 hover:text-pink-400 hover:scale-105 active:scale-95 transition-all border border-white/20">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+
+            <!-- Mode Switcher Circle Button (Stickers <-> Neon Drawing) -->
+            <button id="modeToggleBtn" title="Switch between Stickers and Neon Drawing" class="w-12 h-12 sm:w-13 sm:h-13 rounded-full glass-panel shadow-xl flex items-center justify-center border-2 border-pink-500/60 text-pink-400 hover:text-white hover:bg-pink-600 hover:scale-110 active:scale-95 transition-all relative group">
+                <i id="modeIcon" class="fa-solid fa-paintbrush text-lg"></i>
+                <span id="modeBadge" class="absolute -top-1 -right-1 bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow">Draw</span>
+            </button>
+
+            <!-- Menu Popover / Drawer -->
+            <div id="miniMenuDrawer" class="hidden absolute bottom-16 left-0 w-72 glass-panel rounded-2xl p-4 shadow-2xl border border-white/20 flex flex-col gap-3 transition-all duration-200 origin-bottom-left z-30">
+                <div class="flex items-center justify-between border-b border-gray-700/80 pb-2">
+                    <h3 class="font-bold text-gray-100 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-bars-staggered text-pink-500"></i> Menu & Tools
+                    </h3>
+                    <button id="closeMenuBtn" class="text-gray-400 hover:text-gray-200 p-1 rounded-lg">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Functional Quick Actions -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button id="btnUndo" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-gray-200 hover:text-pink-400 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-rotate-left text-base mb-1"></i>
+                        <span class="text-[10px] font-medium">Undo</span>
+                    </button>
+                    <button id="btnClear" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-red-400 hover:bg-red-950/40 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-trash-can text-base mb-1"></i>
+                        <span class="text-[10px] font-medium">Clear</span>
+                    </button>
+                    <button id="btnSave" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-emerald-400 hover:bg-emerald-950/40 shadow-sm transition active:scale-95">
+                        <i class="fa-solid fa-download text-base mb-1"></i>
+                        <span class="text-[10px] font-medium">Save</span>
+                    </button>
+                </div>
+
+                <!-- Sticker / Brush Settings -->
+                <div class="space-y-2 pt-1 border-t border-gray-700/60">
+                    <div class="flex justify-between items-center text-xs text-gray-300 font-medium">
+                        <span id="sizeLabelText">Sticker / Line Size</span>
+                        <span id="sizeValueText" class="font-bold text-pink-400">72px</span>
+                    </div>
+                    <input id="stickerSizeSlider" type="range" min="10" max="150" value="72" class="w-full accent-pink-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-xs text-gray-300 font-medium">Random Rotation</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="randomRotateToggle" type="checkbox" checked class="sr-only peer">
+                            <div class="w-8 h-4.5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-pink-600"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Placeholder Menu Selections -->
+                <div class="pt-2 border-t border-gray-700/60 space-y-1.5">
+                    <div class="text-[10px] font-bold tracking-wider text-gray-500 uppercase">Future Modes</div>
+                    <button class="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-400 bg-gray-800/40 rounded-xl cursor-not-allowed opacity-70" disabled>
+                        <span class="flex items-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Neon Trail FX</span>
+                        <span class="text-[9px] bg-purple-900/60 text-purple-300 px-1.5 py-0.5 rounded font-semibold">Soon</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: Row of Items (Stickers OR Neon Drawing Options) -->
+        <div class="pointer-events-auto max-w-[58vw] sm:max-w-md md:max-w-lg lg:max-w-xl glass-panel px-3 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 overflow-x-auto no-scrollbar border border-white/20">
+            <div id="mainDock" class="flex items-center gap-2">
+                <!-- Dynamic Content Populated by JS -->
+            </div>
+        </div>
+
+        <!-- BOTTOM RIGHT: Color Picker Circle Button -->
+        <div class="relative pointer-events-auto">
+            <!-- EXPANDED & WIDER PALETTE POPOVER -->
+            <div id="colorPaletteMenu" class="hidden absolute bottom-16 right-0 glass-panel p-4 rounded-3xl shadow-2xl border border-white/20 w-[90vw] sm:w-[500px] max-w-xl transition-all duration-200 origin-bottom-right z-30 max-h-[82vh] overflow-y-auto no-scrollbar flex flex-col gap-3.5">
+                
+                <!-- 1. Canvas Background Color Row -->
+                <div class="space-y-1.5 border-b border-gray-700/80 pb-2.5">
+                    <div class="flex items-center justify-between text-xs font-bold text-gray-200">
+                        <span class="text-emerald-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <i class="fa-solid fa-image"></i> Canvas Background Color
+                        </span>
+                        <span id="currentBgLabel" class="text-[10px] text-gray-400 font-semibold">Dark Studio</span>
+                    </div>
+                    <div id="bgSwatches" class="grid grid-cols-6 gap-2">
+                        <!-- Background color bubbles -->
+                    </div>
+                </div>
+
+                <!-- 2. UV Blacklight Splatters -->
+                <div class="space-y-1.5 border-b border-gray-700/80 pb-2.5">
+                    <div class="flex items-center justify-between text-xs font-bold text-gray-200">
+                        <span class="text-pink-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <i class="fa-solid fa-bolt text-yellow-400"></i> Blacklight UV Splatter
+                        </span>
+                    </div>
+                    <div id="uvSplatterSwatches" class="grid grid-cols-6 sm:grid-cols-6 gap-2">
+                        <!-- UV Splatter bubbles -->
+                    </div>
+                </div>
+
+                <!-- 3. Metallic Glitter Swatches -->
+                <div class="space-y-1.5 border-b border-gray-700/80 pb-2.5">
+                    <div class="flex items-center justify-between text-xs font-bold text-gray-200">
+                        <span class="text-amber-400 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Metallic Glitter
+                        </span>
+                    </div>
+                    <div id="glitterSwatches" class="grid grid-cols-6 sm:grid-cols-6 gap-2">
+                        <!-- Glitter bubbles -->
+                    </div>
+                </div>
+                
+                <!-- 4. Solid Colors Grid -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between text-xs font-bold text-gray-200">
+                        <span class="text-gray-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <i class="fa-solid fa-palette"></i> Solid Colors
+                        </span>
+                    </div>
+                    <div id="colorSwatches" class="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                        <!-- Solid color bubbles -->
+                    </div>
+                </div>
+
+                <!-- 5. Custom Color Picker Input -->
+                <label class="flex items-center justify-between px-3 py-2 rounded-xl bg-gray-800/90 border border-gray-700 cursor-pointer hover:bg-gray-700/80 transition text-xs font-semibold text-gray-300 mt-1">
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-eye-dropper text-pink-400"></i> Custom Solid Color</span>
+                    <input type="color" id="customColorPicker" value="#FF007F" class="w-7 h-7 rounded-md cursor-pointer border-0 bg-transparent p-0">
+                </label>
+            </div>
+
+            <!-- Main Color Circle Button -->
+            <button id="colorPickerBtn" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-gray-900 transition-all transform hover:scale-110 active:scale-95 color-badge-pulse relative group overflow-hidden">
+                <div id="currentColorDisplay" class="w-full h-full rounded-full transition-colors duration-200" style="background-color: #FF007F;"></div>
+                <div id="styleOverlayIcon" class="absolute inset-0 uv-splatter-swatch pointer-events-none opacity-90"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                    <i class="fa-solid fa-palette text-base sm:text-lg"></i>
+                </div>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // --- STICKER DEFINITIONS ---
+        const STICKER_LIBRARY = [
+            {
+                id: 'star',
+                name: 'Star',
+                draw: (ctx, size) => {
+                    const rOut = size * 0.45;
+                    const rIn = size * 0.21;
+                    ctx.beginPath();
+                    for (let i = 0; i < 10; i++) {
+                        const r = i % 2 === 0 ? rOut : rIn;
+                        const angle = (i * Math.PI) / 5 - Math.PI / 2;
+                        const x = Math.cos(angle) * r;
+                        const y = Math.sin(angle) * r;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'heart',
+                name: 'Heart',
+                draw: (ctx, size) => {
+                    const s = size * 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(0, s * 0.3);
+                    ctx.bezierCurveTo(-s, -s * 0.5, -s * 1.1, s * 0.5, 0, s * 1.2);
+                    ctx.bezierCurveTo(s * 1.1, s * 0.5, s, -s * 0.5, 0, s * 0.3);
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'smile',
+                name: 'Smiley',
+                draw: (ctx, size) => {
+                    const r = size * 0.42;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r, 0, Math.PI * 2);
+                    ctx.closePath();
+                },
+                overlay: (ctx, size) => {
+                    const r = size * 0.42;
+                    ctx.fillStyle = '#0f0f1c';
+                    ctx.beginPath();
+                    ctx.arc(-r * 0.35, -r * 0.2, r * 0.12, 0, Math.PI * 2);
+                    ctx.arc(r * 0.35, -r * 0.2, r * 0.12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#0f0f1c';
+                    ctx.lineWidth = Math.max(2, size * 0.07);
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.arc(0, r * 0.05, r * 0.5, 0.2 * Math.PI, 0.8 * Math.PI);
+                    ctx.stroke();
+                }
+            },
+            {
+                id: 'crown',
+                name: 'Crown',
+                draw: (ctx, size) => {
+                    const w = size * 0.45;
+                    const h = size * 0.35;
+                    ctx.beginPath();
+                    ctx.moveTo(-w, h * 0.8);
+                    ctx.lineTo(-w * 0.9, -h * 0.6);
+                    ctx.lineTo(-w * 0.4, h * 0.1);
+                    ctx.lineTo(0, -h * 0.9);
+                    ctx.lineTo(w * 0.4, h * 0.1);
+                    ctx.lineTo(w * 0.9, -h * 0.6);
+                    ctx.lineTo(w, h * 0.8);
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'flower',
+                name: 'Flower',
+                draw: (ctx, size) => {
+                    const r = size * 0.18;
+                    const petals = 5;
+                    ctx.beginPath();
+                    for (let i = 0; i < petals; i++) {
+                        const angle = (i * 2 * Math.PI) / petals;
+                        const px = Math.cos(angle) * r * 1.5;
+                        const py = Math.sin(angle) * r * 1.5;
+                        ctx.moveTo(px + r, py);
+                        ctx.arc(px, py, r * 1.1, 0, Math.PI * 2);
+                    }
+                    ctx.closePath();
+                },
+                overlay: (ctx, size) => {
+                    ctx.fillStyle = '#0f0f1c';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            },
+            {
+                id: 'sparkle',
+                name: 'Sparkle',
+                draw: (ctx, size) => {
+                    const s = size * 0.45;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -s);
+                    ctx.quadraticCurveTo(0, 0, s, 0);
+                    ctx.quadraticCurveTo(0, 0, 0, s);
+                    ctx.quadraticCurveTo(0, 0, -s, 0);
+                    ctx.quadraticCurveTo(0, 0, 0, -s);
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'paw',
+                name: 'Paw',
+                draw: (ctx, size) => {
+                    const s = size * 0.4;
+                    ctx.beginPath();
+                    ctx.ellipse(0, s * 0.2, s * 0.55, s * 0.45, 0, 0, Math.PI * 2);
+                    ctx.ellipse(-s * 0.5, -s * 0.3, s * 0.2, s * 0.28, -0.3, 0, Math.PI * 2);
+                    ctx.ellipse(-s * 0.18, -s * 0.55, s * 0.2, s * 0.3, -0.1, 0, Math.PI * 2);
+                    ctx.ellipse(s * 0.18, -s * 0.55, s * 0.2, s * 0.3, 0.1, 0, Math.PI * 2);
+                    ctx.ellipse(s * 0.5, -s * 0.3, s * 0.2, s * 0.28, 0.3, 0, Math.PI * 2);
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'lightning',
+                name: 'Bolt',
+                draw: (ctx, size) => {
+                    const s = size * 0.45;
+                    ctx.beginPath();
+                    ctx.moveTo(s * 0.1, -s);
+                    ctx.lineTo(-s * 0.4, -s * 0.05);
+                    ctx.lineTo(0, -s * 0.05);
+                    ctx.lineTo(-s * 0.2, s);
+                    ctx.lineTo(s * 0.4, -0.05);
+                    ctx.lineTo(0, -0.05);
+                    ctx.closePath();
+                }
+            },
+            {
+                id: 'gem',
+                name: 'Gem',
+                draw: (ctx, size) => {
+                    const w = size * 0.4;
+                    const h = size * 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(-w * 0.6, -h);
+                    ctx.lineTo(w * 0.6, -h);
+                    ctx.lineTo(w, -h * 0.3);
+                    ctx.lineTo(0, h);
+                    ctx.lineTo(-w, -h * 0.3);
+                    ctx.closePath();
+                }
+            }
+        ];
+
+        // --- NEON DRAWING TOOLS DEFINITIONS ---
+        const DRAWING_TOOLS = [
+            { id: 'glow_pen', name: 'Neon Glow Pen', icon: 'fa-pen-nib', baseWidth: 8 },
+            { id: 'splatter_spray', name: 'Paint Splatter', icon: 'fa-spray-can', baseWidth: 26 },
+            { id: 'neon_marker', name: 'Neon Marker', icon: 'fa-highlighter', baseWidth: 22 },
+            { id: 'sparkle_brush', name: 'Sparkle Trail', icon: 'fa-wand-magic-sparkles', baseWidth: 16 },
+            { id: 'neon_eraser', name: 'Neon Eraser', icon: 'fa-eraser', baseWidth: 32 }
+        ];
+
+        // Background Presets
+        const BACKGROUND_PRESETS = [
+            { name: 'Dark Studio', color: '#121224', border: '#252548' },
+            { name: 'Pure Black', color: '#000000', border: '#333333' },
+            { name: 'Pure White', color: '#FFFFFF', border: '#CCCCCC' },
+            { name: 'Neon Yellow', color: '#FFFF00', border: '#CCCC00' },
+            { name: 'Neon Pink', color: '#FF007F', border: '#CC0066' },
+            { name: 'Neon Green', color: '#00FF66', border: '#00CC52' }
+        ];
+
+        // UV Splatter Style Presets
+        const UV_SPLATTER_PRESETS = [
+            { name: 'Hot Pink UV', baseColor: '#FF007F', neonGlow: '#FF1493', splatters: ['#00FF66', '#00E5FF', '#FFEA00', '#CC00FF', '#FFFFFF'] },
+            { name: 'Neon Lime UV', baseColor: '#CCFF00', neonGlow: '#CCFF00', splatters: ['#00E5FF', '#FF007F', '#FF6600', '#00FF66', '#FFFFFF'] },
+            { name: 'Ultraviolet', baseColor: '#8A2BE2', neonGlow: '#BF55EC', splatters: ['#00FF88', '#FF007F', '#00E5FF', '#FFFF00', '#FFFFFF'] },
+            { name: 'Electric Cyan', baseColor: '#00E5FF', neonGlow: '#00F0FF', splatters: ['#FF007F', '#CCFF00', '#FF5500', '#CC00FF', '#FFFFFF'] },
+            { name: 'Fluorescent', baseColor: '#FF5500', neonGlow: '#FF6600', splatters: ['#00FF66', '#00E5FF', '#FFFF00', '#FF007F', '#FFFFFF'] },
+            { name: 'Bright Yellow', baseColor: '#FFE600', neonGlow: '#FFFF00', splatters: ['#FF007F', '#00E5FF', '#00FF66', '#9900FF', '#FFFFFF'] }
+        ];
+
+        const GLITTER_COLORS = [
+            { name: 'Gold Glitter', color: '#FFD700' },
+            { name: 'Pink Glitter', color: '#FF1493' },
+            { name: 'Blue Glitter', color: '#00BFFF' },
+            { name: 'Purple Glitter', color: '#9370DB' },
+            { name: 'Emerald Glitter', color: '#00FF7F' },
+            { name: 'Silver Glitter', color: '#E0E0E0' }
+        ];
+
+        const PRESET_COLORS = [
+            '#FF4757', '#FF6B81', '#FFA502', '#2ED573', '#1E90FF', 
+            '#3742FA', '#70A1FF', '#9B59B6', '#E84393', '#2F3542'
+        ];
+
+        // --- APP STATE & BUFFERS ---
+        const state = {
+            mode: 'stickers',
+            activeStickerId: STICKER_LIBRARY[0].id,
+            activeToolId: DRAWING_TOOLS[0].id,
+            bgColor: '#121224',
+            bgName: 'Dark Studio',
+            styleType: 'uv',
+            activeColor: '#FF007F',
+            uvConfig: UV_SPLATTER_PRESETS[0],
+            stickerSize: 72,
+            randomRotate: true,
+            history: [],
+            currentPath: null,
+            particles: [],
+            activeAnimations: [], // Separate list for decoupled animations
+            cursorPos: { x: -1000, y: -1000 },
+            isMouseOnCanvas: false,
+            isDrawing: false,
+            isMusicPlaying: false,
+            animLoopActive: false
+        };
+
+        // Highly Optimized Caching for Patterns (Prevents GC Stuttering & Freezing)
+        const patternCache = {};
+        const splatterCanvasCache = {};
+        const glitterCanvasCache = {};
+
+        function getUVSplatterCanvas(uvConfig) {
+            const cacheKey = `uv_${uvConfig.baseColor}_${uvConfig.splatters.join('')}`;
+            if (splatterCanvasCache[cacheKey]) return splatterCanvasCache[cacheKey];
+
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = 100;
+            pCanvas.height = 100;
+            const pCtx = pCanvas.getContext('2d');
+
+            pCtx.fillStyle = uvConfig.baseColor;
+            pCtx.fillRect(0, 0, 100, 100);
+
+            for (let i = 0; i < 220; i++) {
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                const radius = Math.random() < 0.8 ? Math.random() * 1.8 + 0.5 : Math.random() * 4 + 1.2;
+                const color = uvConfig.splatters[Math.floor(Math.random() * uvConfig.splatters.length)];
+
+                pCtx.fillStyle = color;
+                pCtx.beginPath();
+                pCtx.arc(x, y, radius, 0, Math.PI * 2);
+                pCtx.fill();
+            }
+
+            splatterCanvasCache[cacheKey] = pCanvas;
+            return pCanvas;
+        }
+
+        function getGlitterCanvas(baseColor) {
+            if (glitterCanvasCache[baseColor]) return glitterCanvasCache[baseColor];
+
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = 64;
+            pCanvas.height = 64;
+            const pCtx = pCanvas.getContext('2d');
+
+            pCtx.fillStyle = baseColor;
+            pCtx.fillRect(0, 0, 64, 64);
+
+            for (let i = 0; i < 200; i++) {
+                const x = Math.random() * 64;
+                const y = Math.random() * 64;
+                const radius = Math.random() * 1.5 + 0.4;
+                const rand = Math.random();
+                pCtx.fillStyle = rand > 0.6 ? '#FFFFFF' : (rand > 0.3 ? '#FFF8DC' : 'rgba(0,0,0,0.2)');
+
+                pCtx.beginPath();
+                pCtx.arc(x, y, radius, 0, Math.PI * 2);
+                pCtx.fill();
+            }
+
+            glitterCanvasCache[baseColor] = pCanvas;
+            return pCanvas;
+        }
+
+        function getCachedPattern(context, type, config) {
+            let cacheKey;
+            if (type === 'uv') cacheKey = `p_uv_${config.baseColor}`;
+            else cacheKey = `p_glit_${config}`;
+
+            if (patternCache[cacheKey]) return patternCache[cacheKey];
+
+            let pCanvas;
+            if (type === 'uv') pCanvas = getUVSplatterCanvas(config);
+            else pCanvas = getGlitterCanvas(config);
+
+            const pattern = context.createPattern(pCanvas, 'repeat');
+            patternCache[cacheKey] = pattern;
+            return pattern;
+        }
+
+        // DOM Cache Variables
+        let canvas, ctx, bufferCanvas, bufferCtx;
+        let mainDock, colorPickerBtn, currentColorDisplay, styleOverlayIcon, colorPaletteMenu;
+        let bgSwatches, currentBgLabel, colorSwatches, glitterSwatches, uvSplatterSwatches, customColorPicker;
+        let miniMenuBtn, miniMenuDrawer, closeMenuBtn, modeToggleBtn, modeIcon, modeBadge;
+        let fullscreenToggleBtn, fullscreenIcon;
+        let musicToggleBtn, musicIcon, jackpotBanner, jackpotFlashOverlay;
+        let btnUndo, btnClear, btnSave, stickerSizeSlider, sizeValueText, randomRotateToggle;
+
+        // --- WEB AUDIO SYNTHESIZERS ---
+        let audioCtx = null;
+        let musicTimer = null;
+        let musicStep = 0;
+
+        const TODDLER_TUNE = [
+            { freq: 523.25, bass: 130.81 }, { freq: 659.25, bass: 130.81 },
+            { freq: 783.99, bass: 196.00 }, { freq: 1046.50, bass: 196.00 },
+            { freq: 880.00, bass: 220.00 }, { freq: 783.99, bass: 220.00 },
+            { freq: 659.25, bass: 174.61 }, { freq: 587.33, bass: 174.61 },
+            { freq: 523.25, bass: 130.81 }, { freq: 659.25, bass: 130.81 },
+            { freq: 783.99, bass: 196.00 }, { freq: 880.00, bass: 196.00 },
+            { freq: 783.99, bass: 130.81 }, { freq: 659.25, bass: 130.81 },
+            { freq: 587.33, bass: 196.00 }, { freq: 392.00, bass: 196.00 }
+        ];
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioCtx = new AudioContextClass();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playPluckNote(freq, isBass = false) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = isBass ? 'triangle' : 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                const volume = isBass ? 0.08 : 0.12;
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (isBass ? 0.45 : 0.35));
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + (isBass ? 0.45 : 0.35));
+            } catch (e) {}
+        }
+
+        function startToddlerMusic() {
+            initAudioContext();
+            if (state.isMusicPlaying) return;
+
+            state.isMusicPlaying = true;
+            if (musicIcon) musicIcon.className = "fa-solid fa-music text-lg";
+            if (musicToggleBtn) musicToggleBtn.classList.add("music-playing");
+
+            musicStep = 0;
+            musicTimer = setInterval(() => {
+                if (!state.isMusicPlaying) return;
+                const note = TODDLER_TUNE[musicStep % TODDLER_TUNE.length];
+                playPluckNote(note.freq, false);
+                if (musicStep % 2 === 0) playPluckNote(note.bass, true);
+                musicStep++;
+            }, 260);
+        }
+
+        function stopToddlerMusic() {
+            state.isMusicPlaying = false;
+            if (musicTimer) {
+                clearInterval(musicTimer);
+                musicTimer = null;
+            }
+            if (musicIcon) musicIcon.className = "fa-solid fa-music-slash text-lg";
+            if (musicToggleBtn) musicToggleBtn.classList.remove("music-playing");
+        }
+
+        function toggleToddlerMusic() {
+            if (state.isMusicPlaying) stopToddlerMusic();
+            else startToddlerMusic();
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'absolute top-20 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2 rounded-full shadow-xl text-sm font-bold text-white bg-gray-900/90 pointer-events-none border border-pink-500/50 transition-opacity duration-300';
+            toast.innerHTML = `<i class="fa-solid fa-circle-exclamation text-pink-500 mr-2"></i> ${message}`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- FULLSCREEN API ---
+        function toggleFullscreen() {
+            const doc = window.document;
+            const docEl = doc.documentElement;
+
+            const requestFullScreen = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+            const cancelFullScreen = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+
+            const isFullscreen = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
+
+            if (!isFullscreen) {
+                if (requestFullScreen) {
+                    const promise = requestFullScreen.call(docEl);
+                    if (promise && promise.catch) {
+                        promise.catch(err => {
+                            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                            showToast("Fullscreen blocked by browser or preview frame.");
+                        });
+                    }
+                } else {
+                    showToast("Fullscreen is not supported on this device/browser.");
+                }
+            } else {
+                if (cancelFullScreen) {
+                    cancelFullScreen.call(doc);
+                }
+            }
+        }
+
+        function playStampAudio(styleType) {
+            initAudioContext();
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = styleType === 'uv' ? 'sawtooth' : (styleType === 'glitter' ? 'triangle' : 'sine');
+                const startFreq = styleType === 'uv' ? 600 : 300;
+                osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(startFreq * 2.5, audioCtx.currentTime + 0.08);
+
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            } catch (e) {}
+        }
+
+        function playCasinoJackpotTune() {
+            initAudioContext();
+            if (!audioCtx) return;
+
+            const vegasArpeggio = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00];
+            vegasArpeggio.forEach((freq, idx) => {
+                setTimeout(() => {
+                    try {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                        gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.35);
+                    } catch (e) {}
+                }, idx * 60);
+            });
+
+            for (let i = 0; i < 10; i++) {
+                setTimeout(() => {
+                    try {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(2800 + Math.random() * 1200, audioCtx.currentTime);
+                        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.18);
+                    } catch (e) {}
+                }, 420 + i * 80);
+            }
+        }
+
+        // --- CANVAS RESIZING & OFFSCREEN BUFFER MANAGEMENT ---
+        function resizeCanvas() {
+            if (!canvas || !bufferCanvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(window.innerWidth * dpr);
+            canvas.height = Math.floor(window.innerHeight * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            bufferCanvas.width = Math.floor(window.innerWidth * dpr);
+            bufferCanvas.height = Math.floor(window.innerHeight * dpr);
+            bufferCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            rebakeBufferCanvas();
+            renderCanvas();
+        }
+
+        function rebakeBufferCanvas() {
+            if (!bufferCtx) return;
+            bufferCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+
+            state.history.forEach(item => {
+                if (item.type === 'stamp') {
+                    const stickerDef = STICKER_LIBRARY.find(s => s.id === item.stickerId);
+                    if (stickerDef) {
+                        bufferCtx.save();
+                        bufferCtx.translate(item.x, item.y);
+                        drawStickerObject(bufferCtx, stickerDef, item, item.size, item.rotation);
+                        bufferCtx.restore();
+                    }
+                } else if (item.type === 'path') {
+                    drawPathObject(bufferCtx, item);
+                }
+            });
+        }
+
+        // --- STICKER DRAWING ENGINE ---
+        function drawStickerObject(context, stickerDef, stampData, size, rotationAngle = 0) {
+            const { styleType, activeColor, uvConfig } = stampData;
+
+            context.save();
+            context.rotate(rotationAngle);
+
+            if (styleType === 'uv') {
+                // UV BLACKLIGHT STYLE
+                context.fillStyle = '#0a0a16';
+                context.strokeStyle = '#0a0a16';
+                context.lineWidth = Math.max(14, size * 0.22);
+                context.lineJoin = 'round';
+                context.lineCap = 'round';
+
+                context.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                context.shadowBlur = 12;
+                context.shadowOffsetY = 6;
+
+                stickerDef.draw(context, size);
+                context.fill();
+                context.stroke();
+
+                context.shadowColor = 'transparent';
+
+                context.strokeStyle = uvConfig.neonGlow;
+                context.lineWidth = Math.max(3, size * 0.06);
+                context.shadowColor = uvConfig.neonGlow;
+                context.shadowBlur = 8;
+
+                stickerDef.draw(context, size);
+                context.stroke();
+
+                context.shadowColor = 'transparent';
+
+                context.fillStyle = getCachedPattern(context, 'uv', uvConfig);
+                stickerDef.draw(context, size);
+                context.fill();
+
+            } else {
+                // STANDARD / GLITTER STICKER STYLE
+                context.fillStyle = '#FFFFFF';
+                context.strokeStyle = '#FFFFFF';
+                context.lineWidth = Math.max(6, size * 0.12);
+                context.lineJoin = 'round';
+                context.lineCap = 'round';
+
+                context.shadowColor = 'rgba(0, 0, 0, 0.18)';
+                context.shadowBlur = 8;
+                context.shadowOffsetY = 4;
+
+                stickerDef.draw(context, size);
+                context.fill();
+                context.stroke();
+
+                context.shadowColor = 'transparent';
+
+                if (styleType === 'glitter') {
+                    context.fillStyle = getCachedPattern(context, 'glitter', activeColor);
+                } else {
+                    context.fillStyle = activeColor;
+                }
+                
+                stickerDef.draw(context, size);
+                context.fill();
+
+                if (styleType === 'glitter') {
+                    context.fillStyle = '#FFFFFF';
+                    for (let i = 0; i < 4; i++) {
+                        const sx = (Math.sin(i * 2.1) * size * 0.25);
+                        const sy = (Math.cos(i * 1.7) * size * 0.25);
+                        context.beginPath();
+                        context.arc(sx, sy, size * 0.04, 0, Math.PI * 2);
+                        context.fill();
+                    }
+                }
+            }
+
+            if (stickerDef.overlay) {
+                stickerDef.overlay(context, size);
+            }
+
+            context.restore();
+        }
+
+        // --- PATH RENDERER (Optimized Segment Drawing) ---
+        function drawPathSegment(context, pathData, p1, p2) {
+            const { toolId, color, styleType, uvConfig, width } = pathData;
+            context.save();
+            
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+
+            if (toolId === 'neon_eraser') {
+                context.globalCompositeOperation = 'destination-out';
+                context.strokeStyle = 'rgba(0,0,0,1)';
+                context.lineWidth = width * 1.5;
+                context.beginPath();
+                context.moveTo(p1.x, p1.y);
+                context.lineTo(p2.x, p2.y);
+                context.stroke();
+
+            } else if (toolId === 'glow_pen') {
+                const glowColor = styleType === 'uv' ? uvConfig.neonGlow : color;
+                context.shadowColor = glowColor;
+                context.shadowBlur = Math.max(10, width * 0.8);
+                context.strokeStyle = glowColor;
+                context.lineWidth = width;
+
+                context.beginPath();
+                context.moveTo(p1.x, p1.y);
+                context.lineTo(p2.x, p2.y);
+                context.stroke();
+
+                context.shadowBlur = 0;
+                context.strokeStyle = '#FFFFFF';
+                context.lineWidth = Math.max(2, width * 0.3);
+                context.stroke();
+
+            } else if (toolId === 'neon_marker') {
+                context.lineCap = 'square';
+                context.globalAlpha = 0.65;
+                const glowColor = styleType === 'uv' ? uvConfig.baseColor : color;
+
+                context.shadowColor = glowColor;
+                context.shadowBlur = 8;
+                context.strokeStyle = glowColor;
+                context.lineWidth = width * 1.4;
+
+                context.beginPath();
+                context.moveTo(p1.x, p1.y);
+                context.lineTo(p2.x, p2.y);
+                context.stroke();
+
+            } else if (toolId === 'splatter_spray') {
+                const splatterColors = styleType === 'uv' ? uvConfig.splatters : [color, '#00FFCC', '#FF007F', '#FFFF00'];
+                for (let j = 0; j < 4; j++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = Math.random() * width * 1.1;
+                    const sx = p2.x + Math.cos(angle) * radius;
+                    const sy = p2.y + Math.sin(angle) * radius;
+
+                    context.fillStyle = splatterColors[Math.floor(Math.random() * splatterColors.length)];
+                    context.beginPath();
+                    context.arc(sx, sy, Math.random() * 2 + 0.8, 0, Math.PI * 2);
+                    context.fill();
+                }
+
+            } else if (toolId === 'sparkle_brush') {
+                const strokeColor = styleType === 'uv' ? uvConfig.neonGlow : color;
+                context.shadowColor = strokeColor;
+                context.shadowBlur = 12;
+                context.strokeStyle = strokeColor;
+                context.lineWidth = width * 0.6;
+
+                context.beginPath();
+                context.moveTo(p1.x, p1.y);
+                context.lineTo(p2.x, p2.y);
+                context.stroke();
+
+                context.shadowBlur = 0;
+                if (Math.random() > 0.4) {
+                    context.fillStyle = '#FFFFFF';
+                    context.beginPath();
+                    context.arc(p2.x, p2.y, Math.random() * 3 + 1.5, 0, Math.PI * 2);
+                    context.fill();
+                }
+            }
+
+            context.restore();
+        }
+
+        function drawPathObject(context, pathData) {
+            if (!pathData.points || pathData.points.length === 0) return;
+            let p1 = pathData.points[0];
+            drawPathSegment(context, pathData, p1, p1);
+            for (let i = 1; i < pathData.points.length; i++) {
+                let p2 = pathData.points[i];
+                drawPathSegment(context, pathData, p1, p2);
+                p1 = p2;
+            }
+        }
+
+        // --- LAS VEGAS CASINO WIN PARTICLES ---
+        function spawnJackpotParticles(x, y) {
+            const colors = ['#FFD700', '#FFA502', '#FF007F', '#00FFCC', '#00E5FF', '#FFFFFF', '#CC00FF'];
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 11 + 3;
+                state.particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2.5,
+                    gravity: 0.22,
+                    size: Math.random() * 9 + 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    isCoin: Math.random() < 0.4,
+                    rotation: Math.random() * Math.PI,
+                    vRot: (Math.random() - 0.5) * 0.3,
+                    alpha: 1,
+                    decay: Math.random() * 0.015 + 0.012
+                });
+            }
+            
+            // Push decoupled animation ring
+            state.activeAnimations.push({ x, y, size: state.stickerSize, startTime: Date.now() });
+            startAnimationLoop();
+        }
+
+        function updateAndDrawParticles() {
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.rotation += p.vRot;
+                p.alpha -= p.decay;
+
+                if (p.alpha <= 0) {
+                    state.particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+
+                if (p.isCoin) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.strokeStyle = '#FFA502';
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, p.size, p.size * 0.6, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#7A5200';
+                    ctx.font = `bold ${Math.floor(p.size)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('$', 0, 0);
+                } else {
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // --- ULTRA FAST MAIN RENDERER (< 1ms execution) ---
+        function renderCanvas() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            // Draw Background Color
+            ctx.fillStyle = state.bgColor;
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+            // Draw Pre-baked Offscreen Buffer
+            if (bufferCanvas) {
+                ctx.drawImage(bufferCanvas, 0, 0, window.innerWidth, window.innerHeight);
+            }
+
+            // Render Decoupled Animations (Jackpot glowing rings)
+            const now = Date.now();
+            for (let i = state.activeAnimations.length - 1; i >= 0; i--) {
+                const anim = state.activeAnimations[i];
+                const elapsed = (now - anim.startTime) / 1000;
+                if (elapsed > 2.5) {
+                    state.activeAnimations.splice(i, 1);
+                } else {
+                    const pulseScale = 1 + Math.sin(elapsed * Math.PI * 4) * 0.12;
+                    ctx.save();
+                    ctx.translate(anim.x, anim.y);
+                    ctx.scale(pulseScale, pulseScale);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, anim.size, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(255, 215, 0, ${1 - (elapsed / 2.5)})`; // Fades out
+                    ctx.lineWidth = Math.max(12, anim.size * 0.2);
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 20;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // Render Particles
+            if (state.particles.length > 0) {
+                updateAndDrawParticles();
+            }
+
+            // Render Cursor Preview
+            if (state.isMouseOnCanvas && state.mode === 'stickers' && !state.isDrawing) {
+                const activeStickerDef = STICKER_LIBRARY.find(s => s.id === state.activeStickerId);
+                if (activeStickerDef) {
+                    ctx.save();
+                    ctx.translate(state.cursorPos.x, state.cursorPos.y);
+                    ctx.globalAlpha = 0.8;
+                    drawStickerObject(ctx, activeStickerDef, state, state.stickerSize, 0);
+                    ctx.restore();
+                }
+            }
+        }
+
+        // Conditional Animation Loop for Particles & Jackpots
+        function startAnimationLoop() {
+            if (state.animLoopActive) return;
+            state.animLoopActive = true;
+
+            function animStep() {
+                renderCanvas();
+                if (state.particles.length > 0 || state.activeAnimations.length > 0) {
+                    requestAnimationFrame(animStep);
+                } else {
+                    state.animLoopActive = false;
+                }
+            }
+            requestAnimationFrame(animStep);
+        }
+
+        // --- UI DOCK BUILDER ---
+        function renderMainDock() {
+            if (!mainDock) return;
+            mainDock.innerHTML = '';
+
+            if (state.mode === 'stickers') {
+                STICKER_LIBRARY.forEach(sticker => {
+                    const button = document.createElement('button');
+                    button.className = `dock-card flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-gray-700/80 bg-gray-900/80 flex items-center justify-center p-1 relative ${
+                        sticker.id === state.activeStickerId ? 'active' : ''
+                    }`;
+                    button.title = sticker.name;
+
+                    const miniCanvas = document.createElement('canvas');
+                    miniCanvas.width = 56;
+                    miniCanvas.height = 56;
+                    const miniCtx = miniCanvas.getContext('2d');
+
+                    miniCtx.translate(28, 28);
+                    drawStickerObject(miniCtx, sticker, state, 36, 0);
+
+                    button.appendChild(miniCanvas);
+
+                    button.addEventListener('click', () => {
+                        state.activeStickerId = sticker.id;
+                        updateDockSelection();
+                        renderCanvas();
+                    });
+
+                    mainDock.appendChild(button);
+                });
+            } else {
+                DRAWING_TOOLS.forEach(tool => {
+                    const button = document.createElement('button');
+                    button.className = `dock-card flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl border border-gray-700/80 bg-gray-900/80 flex flex-col items-center justify-center p-1 relative text-gray-200 ${
+                        tool.id === state.activeToolId ? 'active' : ''
+                    }`;
+                    button.title = tool.name;
+
+                    button.innerHTML = `
+                        <i class="fa-solid ${tool.icon} text-lg mb-0.5 text-pink-400"></i>
+                        <span class="text-[9px] font-bold text-gray-300 leading-tight">${tool.name.split(' ')[0]}</span>
+                    `;
+
+                    button.addEventListener('click', () => {
+                        state.activeToolId = tool.id;
+                        updateDockSelection();
+                        renderCanvas();
+                    });
+
+                    mainDock.appendChild(button);
+                });
+            }
+        }
+
+        function updateDockSelection() {
+            if (!mainDock) return;
+            const cards = mainDock.querySelectorAll('.dock-card');
+            cards.forEach((card, index) => {
+                if (state.mode === 'stickers') {
+                    const sticker = STICKER_LIBRARY[index];
+                    if (sticker && sticker.id === state.activeStickerId) card.classList.add('active');
+                    else card.classList.remove('active');
+
+                    const miniCanvas = card.querySelector('canvas');
+                    if (miniCanvas) {
+                        const miniCtx = miniCanvas.getContext('2d');
+                        miniCtx.clearRect(0, 0, 56, 56);
+                        miniCtx.save();
+                        miniCtx.translate(28, 28);
+                        drawStickerObject(miniCtx, sticker, state, 36, 0);
+                        miniCtx.restore();
+                    }
+                } else {
+                    const tool = DRAWING_TOOLS[index];
+                    if (tool && tool.id === state.activeToolId) card.classList.add('active');
+                    else card.classList.remove('active');
+                }
+            });
+        }
+
+        // --- PALETTE POPULATOR ---
+        function initColorPalette() {
+            if (!bgSwatches) return;
+
+            // 1. Background Swatches
+            bgSwatches.innerHTML = '';
+            BACKGROUND_PRESETS.forEach(bgItem => {
+                const bubble = document.createElement('button');
+                bubble.className = 'w-8 h-8 rounded-full border-2 shadow-md transform hover:scale-110 active:scale-95 transition-all relative overflow-hidden flex items-center justify-center';
+                bubble.style.backgroundColor = bgItem.color;
+                bubble.style.borderColor = bgItem.border;
+                bubble.title = bgItem.name;
+                
+                bubble.addEventListener('click', () => {
+                    state.bgColor = bgItem.color;
+                    state.bgName = bgItem.name;
+                    if (currentBgLabel) currentBgLabel.textContent = bgItem.name;
+                    renderCanvas();
+                });
+                bgSwatches.appendChild(bubble);
+            });
+
+            // 2. UV Splatter Options
+            uvSplatterSwatches.innerHTML = '';
+            UV_SPLATTER_PRESETS.forEach(preset => {
+                const bubble = document.createElement('button');
+                bubble.className = 'w-8 h-8 rounded-full border-2 border-white/80 shadow-md transform hover:scale-110 active:scale-95 transition-all uv-splatter-swatch relative overflow-hidden';
+                bubble.style.backgroundColor = preset.baseColor;
+                bubble.title = preset.name;
+                
+                bubble.addEventListener('click', () => {
+                    setStyle('uv', preset.baseColor, preset);
+                });
+                uvSplatterSwatches.appendChild(bubble);
+            });
+
+            // 3. Glitter Swatches
+            glitterSwatches.innerHTML = '';
+            GLITTER_COLORS.forEach(gItem => {
+                const bubble = document.createElement('button');
+                bubble.className = 'w-8 h-8 rounded-full border-2 border-white/80 shadow-md transform hover:scale-110 active:scale-95 transition-all glitter-swatch relative overflow-hidden';
+                bubble.style.backgroundColor = gItem.color;
+                bubble.title = gItem.name;
+                
+                bubble.addEventListener('click', () => {
+                    setStyle('glitter', gItem.color);
+                });
+                glitterSwatches.appendChild(bubble);
+            });
+
+            // 4. Solid Swatches
+            colorSwatches.innerHTML = '';
+            PRESET_COLORS.forEach(color => {
+                const bubble = document.createElement('button');
+                bubble.className = 'w-8 h-8 rounded-full border-2 border-white/80 shadow-md transform hover:scale-110 active:scale-95 transition-all';
+                bubble.style.backgroundColor = color;
+                
+                bubble.addEventListener('click', () => {
+                    setStyle('solid', color);
+                });
+                colorSwatches.appendChild(bubble);
+            });
+        }
+
+        function setStyle(type, color, uvPreset = null) {
+            state.styleType = type;
+            state.activeColor = color;
+            if (uvPreset) state.uvConfig = uvPreset;
+
+            if (currentColorDisplay) currentColorDisplay.style.backgroundColor = color;
+            if (styleOverlayIcon) {
+                styleOverlayIcon.className = 'absolute inset-0 pointer-events-none opacity-90 ';
+                if (type === 'uv') styleOverlayIcon.classList.add('uv-splatter-swatch');
+                else if (type === 'glitter') styleOverlayIcon.classList.add('glitter-swatch');
+            }
+
+            if (customColorPicker) customColorPicker.value = color;
+            updateDockSelection();
+            if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        // --- TRIGGER VEGAS CASINO WIN ---
+        function triggerJackpotWin(x, y) {
+            playCasinoJackpotTune();
+            spawnJackpotParticles(x, y);
+
+            if (jackpotBanner) {
+                jackpotBanner.classList.remove('hidden');
+                jackpotBanner.classList.remove('jackpot-banner-anim');
+                void jackpotBanner.offsetWidth;
+                jackpotBanner.classList.add('jackpot-banner-anim');
+            }
+
+            if (jackpotFlashOverlay) {
+                jackpotFlashOverlay.style.opacity = '1';
+                setTimeout(() => {
+                    jackpotFlashOverlay.style.opacity = '0';
+                }, 350);
+            }
+
+            setTimeout(() => {
+                if (jackpotBanner) jackpotBanner.classList.add('hidden');
+            }, 2800);
+        }
+
+        // --- STAMPING & DRAWING INTERACTIONS ---
+        function placeStamp(x, y) {
+            if (!state.isMusicPlaying) startToddlerMusic();
+
+            const isJackpotWin = Math.random() < 0.12;
+            const rotation = state.randomRotate ? (Math.random() * 0.5 - 0.25) : 0;
+            
+            const newStamp = {
+                type: 'stamp',
+                stickerId: state.activeStickerId,
+                x: x,
+                y: y,
+                styleType: state.styleType,
+                activeColor: state.activeColor,
+                uvConfig: state.uvConfig,
+                size: state.stickerSize,
+                rotation: rotation
+            };
+
+            state.history.push(newStamp);
+
+            // Directly bake to buffer
+            if (bufferCtx) {
+                bufferCtx.save();
+                bufferCtx.translate(x, y);
+                const stickerDef = STICKER_LIBRARY.find(s => s.id === state.activeStickerId);
+                if (stickerDef) drawStickerObject(bufferCtx, stickerDef, newStamp, state.stickerSize, rotation);
+                bufferCtx.restore();
+            }
+
+            if (isJackpotWin) {
+                triggerJackpotWin(x, y);
+            } else {
+                playStampAudio(state.styleType);
+            }
+
+            if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        function startDrawing(x, y) {
+            if (!state.isMusicPlaying) startToddlerMusic();
+
+            state.isDrawing = true;
+            const tool = DRAWING_TOOLS.find(t => t.id === state.activeToolId);
+            const lineW = (state.stickerSize / 72) * (tool ? tool.baseWidth : 12);
+
+            state.currentPath = {
+                type: 'path',
+                toolId: state.activeToolId,
+                color: state.activeColor,
+                styleType: state.styleType,
+                uvConfig: state.uvConfig,
+                width: lineW,
+                points: [{ x, y }]
+            };
+            
+            // Draw initial point directly to buffer
+            drawPathSegment(bufferCtx, state.currentPath, {x,y}, {x,y});
+            if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        function continueDrawing(x, y) {
+            if (!state.isDrawing || !state.currentPath) return;
+            const points = state.currentPath.points;
+            const p1 = points[points.length - 1];
+            const p2 = { x, y };
+            points.push(p2);
+            
+            // Instantly bake segment to buffer
+            drawPathSegment(bufferCtx, state.currentPath, p1, p2);
+            
+            // Trigger visual update
+            if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        function stopDrawing() {
+            if (!state.isDrawing) return;
+            state.isDrawing = false;
+            
+            if (state.currentPath && state.currentPath.points.length > 1) {
+                state.history.push(state.currentPath);
+
+                if (Math.random() < 0.1) {
+                    const lastPt = state.currentPath.points[state.currentPath.points.length - 1];
+                    triggerJackpotWin(lastPt.x, lastPt.y);
+                } else {
+                    playStampAudio(state.styleType);
+                }
+            }
+            state.currentPath = null;
+            if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+        }
+
+        // --- EVENT LISTENERS ---
+        function setupEventListeners() {
+            window.addEventListener('resize', resizeCanvas);
+
+            if (canvas) {
+                canvas.addEventListener('pointerdown', (e) => {
+                    if (e.target === canvas) {
+                        state.cursorPos = { x: e.clientX, y: e.clientY };
+                        if (state.mode === 'stickers') {
+                            placeStamp(e.clientX, e.clientY);
+                        } else {
+                            startDrawing(e.clientX, e.clientY);
+                        }
+                    }
+                });
+
+                canvas.addEventListener('pointermove', (e) => {
+                    state.cursorPos = { x: e.clientX, y: e.clientY };
+                    state.isMouseOnCanvas = true;
+                    if (state.mode === 'drawing' && state.isDrawing) {
+                        continueDrawing(e.clientX, e.clientY);
+                    } else if (!state.animLoopActive) {
+                        requestAnimationFrame(renderCanvas);
+                    }
+                });
+
+                canvas.addEventListener('pointerleave', () => {
+                    state.isMouseOnCanvas = false;
+                    if (state.mode === 'drawing') stopDrawing();
+                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                });
+            }
+
+            window.addEventListener('pointerup', () => {
+                if (state.mode === 'drawing') stopDrawing();
+            });
+
+            if (modeToggleBtn) {
+                modeToggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (state.mode === 'stickers') {
+                        state.mode = 'drawing';
+                        if (modeIcon) modeIcon.className = "fa-solid fa-shapes text-lg";
+                        if (modeBadge) {
+                            modeBadge.textContent = "Stickers";
+                            modeBadge.className = "absolute -top-1 -right-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow";
+                        }
+                    } else {
+                        state.mode = 'stickers';
+                        if (modeIcon) modeIcon.className = "fa-solid fa-paintbrush text-lg";
+                        if (modeBadge) {
+                            modeBadge.textContent = "Draw";
+                            modeBadge.className = "absolute -top-1 -right-1 bg-amber-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase shadow";
+                        }
+                    }
+                    renderMainDock();
+                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                });
+            }
+
+            if (fullscreenToggleBtn) {
+                fullscreenToggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleFullscreen();
+                });
+            }
+
+            const handleFullscreenChange = () => {
+                const isFull = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+                if (isFull) {
+                    if (fullscreenIcon) fullscreenIcon.className = "fa-solid fa-compress text-lg";
+                } else {
+                    if (fullscreenIcon) fullscreenIcon.className = "fa-solid fa-expand text-lg";
+                }
+                setTimeout(resizeCanvas, 100);
+            };
+
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+            if (musicToggleBtn) {
+                musicToggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleToddlerMusic();
+                });
+            }
+
+            if (colorPickerBtn) {
+                colorPickerBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (colorPaletteMenu) colorPaletteMenu.classList.toggle('hidden');
+                    if (miniMenuDrawer) miniMenuDrawer.classList.add('hidden');
+                });
+            }
+
+            if (customColorPicker) {
+                customColorPicker.addEventListener('input', (e) => {
+                    setStyle('solid', e.target.value);
+                });
+            }
+
+            if (miniMenuBtn) {
+                miniMenuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (miniMenuDrawer) miniMenuDrawer.classList.toggle('hidden');
+                    if (colorPaletteMenu) colorPaletteMenu.classList.add('hidden');
+                });
+            }
+
+            if (closeMenuBtn) {
+                closeMenuBtn.addEventListener('click', () => {
+                    if (miniMenuDrawer) miniMenuDrawer.classList.add('hidden');
+                });
+            }
+
+            document.addEventListener('click', (e) => {
+                if (colorPaletteMenu && !colorPaletteMenu.contains(e.target) && colorPickerBtn && !colorPickerBtn.contains(e.target)) {
+                    colorPaletteMenu.classList.add('hidden');
+                }
+                if (miniMenuDrawer && !miniMenuDrawer.contains(e.target) && miniMenuBtn && !miniMenuBtn.contains(e.target)) {
+                    miniMenuDrawer.classList.add('hidden');
+                }
+            });
+
+            if (btnUndo) {
+                btnUndo.addEventListener('click', () => {
+                    state.history.pop();
+                    rebakeBufferCanvas();
+                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                });
+            }
+
+            if (btnClear) {
+                btnClear.addEventListener('click', () => {
+                    if (state.history.length === 0) return;
+                    state.history = [];
+                    rebakeBufferCanvas();
+                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                });
+            }
+
+            if (btnSave) {
+                btnSave.addEventListener('click', () => {
+                    const exportCanvas = document.createElement('canvas');
+                    exportCanvas.width = canvas.width;
+                    exportCanvas.height = canvas.height;
+                    const expCtx = exportCanvas.getContext('2d');
+                    const dpr = window.devicePixelRatio || 1;
+                    expCtx.scale(dpr, dpr);
+
+                    expCtx.fillStyle = state.bgColor;
+                    expCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                    expCtx.drawImage(bufferCanvas, 0, 0, window.innerWidth, window.innerHeight);
+
+                    const link = document.createElement('a');
+                    link.download = `uv-artwork-${Date.now()}.png`;
+                    link.href = exportCanvas.toDataURL('image/png');
+                    link.click();
+                });
+            }
+
+            if (stickerSizeSlider) {
+                stickerSizeSlider.addEventListener('input', (e) => {
+                    state.stickerSize = parseInt(e.target.value);
+                    if (sizeValueText) sizeValueText.textContent = `${state.stickerSize}px`;
+                    if (!state.animLoopActive) requestAnimationFrame(renderCanvas);
+                });
+            }
+
+            if (randomRotateToggle) {
+                randomRotateToggle.addEventListener('change', (e) => {
+                    state.randomRotate = e.target.checked;
+                });
+            }
+        }
+
+        // --- INIT APP ---
+        function init() {
+            canvas = document.getElementById('stickerCanvas');
+            if (!canvas) return;
+            ctx = canvas.getContext('2d');
+
+            bufferCanvas = document.createElement('canvas');
+            bufferCtx = bufferCanvas.getContext('2d');
+
+            mainDock = document.getElementById('mainDock');
+            colorPickerBtn = document.getElementById('colorPickerBtn');
+            currentColorDisplay = document.getElementById('currentColorDisplay');
+            styleOverlayIcon = document.getElementById('styleOverlayIcon');
+            colorPaletteMenu = document.getElementById('colorPaletteMenu');
+            bgSwatches = document.getElementById('bgSwatches');
+            currentBgLabel = document.getElementById('currentBgLabel');
+            colorSwatches = document.getElementById('colorSwatches');
+            glitterSwatches = document.getElementById('glitterSwatches');
+            uvSplatterSwatches = document.getElementById('uvSplatterSwatches');
+            customColorPicker = document.getElementById('customColorPicker');
+
+            miniMenuBtn = document.getElementById('miniMenuBtn');
+            miniMenuDrawer = document.getElementById('miniMenuDrawer');
+            closeMenuBtn = document.getElementById('closeMenuBtn');
+            modeToggleBtn = document.getElementById('modeToggleBtn');
+            modeIcon = document.getElementById('modeIcon');
+            modeBadge = document.getElementById('modeBadge');
+
+            fullscreenToggleBtn = document.getElementById('fullscreenToggleBtn');
+            fullscreenIcon = document.getElementById('fullscreenIcon');
+
+            musicToggleBtn = document.getElementById('musicToggleBtn');
+            musicIcon = document.getElementById('musicIcon');
+            jackpotBanner = document.getElementById('jackpotBanner');
+            jackpotFlashOverlay = document.getElementById('jackpotFlashOverlay');
+
+            btnUndo = document.getElementById('btnUndo');
+            btnClear = document.getElementById('btnClear');
+            btnSave = document.getElementById('btnSave');
+            stickerSizeSlider = document.getElementById('stickerSizeSlider');
+            sizeValueText = document.getElementById('sizeValueText');
+            randomRotateToggle = document.getElementById('randomRotateToggle');
+
+            resizeCanvas();
+            initColorPalette();
+            setStyle('uv', '#FF007F', UV_SPLATTER_PRESETS[0]);
+            renderMainDock();
+            setupEventListeners();
+            requestAnimationFrame(renderCanvas);
+        }
+
+        // Extremely reliable execution for previews
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(init, 50); // slight delay to guarantee DOM reflow
+        } else {
+            document.addEventListener('DOMContentLoaded', () => setTimeout(init, 50));
+        }
+    </script>
+</body>
+</html>
