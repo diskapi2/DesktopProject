@@ -39,11 +39,12 @@ Cloudflare Worker that acts as a read-only proxy:
 
     index.html  ->  Cloudflare Worker  ->  Google Drive (monitor.txt)
 
-Two constants at the top of the `<script>` block configure this:
+The constants at the top of the `<script>` block configure this:
 
 ```js
-const FILE_ID    = '...';  // Google Drive file id of monitor.txt
-const WORKER_URL = '...';  // Cloudflare Worker proxy endpoint
+const FILE_ID       = '...';  // Google Drive file id of monitor.txt
+const WORKER_URL    = '...';  // Cloudflare Worker proxy endpoint
+const DRIVE_API_KEY = '';     // optional, for the direct-fetch backup
 ```
 
 The worker is managed from the Cloudflare dashboard at
@@ -51,6 +52,47 @@ The worker is managed from the Cloudflare dashboard at
 
 Data is fetched once automatically on page load (`window.onload`), and
 thereafter only when **REFRESH** is pressed. There is no polling timer.
+
+### The direct-fetch backup
+
+If the worker fails, the app retries against the Google Drive API directly:
+
+    https://www.googleapis.com/drive/v3/files/FILE_ID?alt=media&key=API_KEY
+
+Unlike the usual `drive.google.com/uc?export=download` link, this endpoint
+sends `Access-Control-Allow-Origin`, so a browser is allowed to read it
+cross-origin. It needs two things:
+
+1. `monitor.txt` shared as **Anyone with the link** — an API key alone can
+   only reach public files.
+2. A Google Cloud project with the Drive API enabled, and an API key.
+
+If no key is configured the backup is skipped and says so; the worker path is
+unaffected. Prefer passing the key by URL flag over committing it, and if you
+do set `DRIVE_API_KEY` in the source, restrict the key to the Drive API and to
+an HTTP referrer — this repository is public.
+
+### Choosing a source
+
+Append these flags to the page URL:
+
+| Flag | Effect |
+| ---- | ------ |
+| *(none)* | Worker first, direct Drive fetch as backup |
+| `?source=drive` | Force the direct Drive fetch, skipping the worker |
+| `?direct=1` | Alias for `?source=drive` |
+| `?source=worker` | Force the worker only, with no backup |
+| `?apiKey=KEY` | Supply or override the Drive API key for this session |
+
+Flags combine, so a direct-fetch test looks like:
+
+    .../vixopia-chart/?direct=1&apiKey=YOUR_KEY
+
+The status line under the buttons names whichever source answered, marking it
+`(backup)` when the worker was tried first and failed. **Debug Info** lists
+every source that failed and why, surfacing the Drive API's own error message
+(for example `The request is missing a valid API key.`) rather than a bare
+status code.
 
 ## Expected data format
 
