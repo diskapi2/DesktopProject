@@ -583,6 +583,19 @@
 
         // How many wrong keys in a row before the prompt is spoken again
         const REPEAT_AFTER_WRONG = 5;
+
+        // Shape of the Las Vegas jackpot tune. The spoken letter waits for it to finish.
+        const JACKPOT_ARP_STEP_MS = 60;
+        const JACKPOT_SPARKLE_START_MS = 420;
+        const JACKPOT_SPARKLE_STEP_MS = 80;
+        const JACKPOT_SPARKLE_COUNT = 10;
+        const JACKPOT_SPARKLE_TAIL_MS = 180;
+        // Last sparkle starts, then rings out: 420 + 9*80 + 180 = 1320ms
+        const JACKPOT_TUNE_MS = JACKPOT_SPARKLE_START_MS +
+                                (JACKPOT_SPARKLE_COUNT - 1) * JACKPOT_SPARKLE_STEP_MS +
+                                JACKPOT_SPARKLE_TAIL_MS;
+        // Breathing room between the tune ending and the next letter being announced
+        const JACKPOT_SPEECH_GAP_MS = 180;
         const EMOJI_FONT = '"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", "Twemoji Mozilla", system-ui, sans-serif';
 
         // Background Presets
@@ -639,6 +652,7 @@
             isMouseOnCanvas: false,
             isDrawing: false,
             isMusicPlaying: false,
+            musicOptOut: false, // set when the user turns the music off themselves
             animLoopActive: false,
             // Reward / Letter game state
             rewards: 0,
@@ -646,7 +660,9 @@
             letter: null,      // letter challenge { char, word, emoji, x, y, shakeUntil, wrongCount }
             lampTimer: null,
             isSpeaking: false,
-            speakTimer: null
+            speakTimer: null,
+            promptTimer: null,
+            jackpotUntil: 0
         };
 
         function usesStickerDock() {
@@ -818,8 +834,22 @@
         }
 
         function toggleToddlerMusic() {
-            if (state.isMusicPlaying) stopToddlerMusic();
-            else startToddlerMusic();
+            if (state.isMusicPlaying) {
+                // Turning it off by hand keeps it off until it is turned back on by hand
+                state.musicOptOut = true;
+                stopToddlerMusic();
+            } else {
+                state.musicOptOut = false;
+                startToddlerMusic();
+            }
+        }
+
+        // Only the music button may start the music once the user has switched it off.
+        function maybeAutoStartMusic() {
+            if (state.musicOptOut) return;
+            if (state.isMusicPlaying) return;
+            if (state.mode === 'lettersound') return; // keep the spoken letter easy to hear
+            startToddlerMusic();
         }
 
         function showToast(message) {
@@ -923,8 +953,16 @@
             }
         }
 
+        function clearPendingPrompt() {
+            if (state.promptTimer) {
+                clearTimeout(state.promptTimer);
+                state.promptTimer = null;
+            }
+        }
+
         function cancelSpeech() {
             state.isSpeaking = false;
+            clearPendingPrompt();
             if (state.speakTimer) {
                 clearTimeout(state.speakTimer);
                 state.speakTimer = null;
@@ -934,10 +972,31 @@
             }
         }
 
-        // Speaks the current prompt. Returns false when the browser has no speech support.
-        function speakLetterPrompt() {
+        // Speaks the current prompt, waiting for any jackpot tune to ring out first so the
+        // two never overlap. Returns false only when the browser has no speech support.
+        function speakLetterPrompt(minDelayMs = 0) {
             const L = state.letter;
             if (!L) return false;
+            if (!speechAvailable()) return false;
+
+            const jackpotWait = state.jackpotUntil - Date.now() + JACKPOT_SPEECH_GAP_MS;
+            const wait = Math.max(minDelayMs, jackpotWait);
+            if (wait > 0) {
+                clearPendingPrompt();
+                state.promptTimer = setTimeout(() => {
+                    state.promptTimer = null;
+                    speakLetterNow(L);
+                }, wait);
+                return true;
+            }
+
+            clearPendingPrompt();
+            return speakLetterNow(L);
+        }
+
+        // Actually speaks, provided the prompt it was queued for is still the live one.
+        function speakLetterNow(L) {
+            if (state.mode !== 'lettersound' || state.letter !== L) return false;
             if (!speechAvailable()) return false;
 
             try {
@@ -977,6 +1036,7 @@
         function playCasinoJackpotTune() {
             initAudioContext();
             if (!audioCtx) return;
+            state.jackpotUntil = Date.now() + JACKPOT_TUNE_MS;
 
             const vegasArpeggio = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00];
             vegasArpeggio.forEach((freq, idx) => {
@@ -994,10 +1054,10 @@
                         osc.start();
                         osc.stop(audioCtx.currentTime + 0.35);
                     } catch (e) {}
-                }, idx * 60);
+                }, idx * JACKPOT_ARP_STEP_MS);
             });
 
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < JACKPOT_SPARKLE_COUNT; i++) {
                 setTimeout(() => {
                     try {
                         const osc = audioCtx.createOscillator();
@@ -1010,9 +1070,9 @@
                         osc.connect(gain);
                         gain.connect(audioCtx.destination);
                         osc.start();
-                        osc.stop(audioCtx.currentTime + 0.18);
+                        osc.stop(audioCtx.currentTime + JACKPOT_SPARKLE_TAIL_MS / 1000);
                     } catch (e) {}
-                }, 420 + i * 80);
+                }, JACKPOT_SPARKLE_START_MS + i * JACKPOT_SPARKLE_STEP_MS);
             }
         }
 
@@ -1720,11 +1780,10 @@
                 L.wrongCount = (L.wrongCount || 0) + 1;
                 L.shakeUntil = performance.now() + 450;
                 playWrongKeyBuzz();
-                // Say the letter again once the child has missed REPEAT_AFTER_WRONG times
+                // Say the letter again once the child has missed REPEAT_AFTER_WRONG times,
+                // leaving room for the buzz to finish first
                 if (state.mode === 'lettersound' && L.wrongCount % REPEAT_AFTER_WRONG === 0) {
-                    setTimeout(() => {
-                        if (state.mode === 'lettersound' && state.letter === L) speakLetterPrompt();
-                    }, 420);
+                    speakLetterPrompt(420);
                 }
             }
             startAnimationLoop();
@@ -2021,8 +2080,7 @@
         // --- STAMPING & DRAWING INTERACTIONS ---
         // jackpot: null = random chance (classic sticker mode), true/false = decided by the game mode
         function placeStamp(x, y, jackpot = null) {
-            // Letter Sound mode stays quiet so the spoken letter is easy to hear
-            if (!state.isMusicPlaying && state.mode !== 'lettersound') startToddlerMusic();
+            maybeAutoStartMusic();
 
             const isJackpotWin = jackpot === null ? Math.random() < 0.12 : !!jackpot;
             const rotation = state.randomRotate ? (Math.random() * 0.5 - 0.25) : 0;
@@ -2060,7 +2118,7 @@
         }
 
         function startDrawing(x, y) {
-            if (!state.isMusicPlaying) startToddlerMusic();
+            maybeAutoStartMusic();
 
             state.isDrawing = true;
             const tool = DRAWING_TOOLS.find(t => t.id === state.activeToolId);
