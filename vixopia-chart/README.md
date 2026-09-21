@@ -72,9 +72,6 @@ cached data.
 
 ## Notes
 
-- The in-app help text refers to the worker as `flat-half-df36`, while
-  `WORKER_URL` points at `flat-hall-df36`. The URL in the code is the one
-  actually used.
 - `FILE_ID` and `WORKER_URL` are committed in plain text. Anyone who can read
   this repository can call that worker endpoint and read the monitor data it
   proxies. Move them out of the source, or put access control on the worker,
