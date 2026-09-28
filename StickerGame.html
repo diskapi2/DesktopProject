@@ -669,7 +669,8 @@
             return state.mode === 'stickers' || state.mode === 'reward' || isLetterMode();
         }
 
-        // Both keyboard challenges: 'letter' shows the letter, 'lettersound' speaks it instead
+        // Both keyboard challenges speak the prompt ("E, as in Elephant").
+        // 'letter' also shows the letter; 'lettersound' only speaks it.
         function isLetterMode() {
             return state.mode === 'letter' || state.mode === 'lettersound';
         }
@@ -996,7 +997,7 @@
 
         // Actually speaks, provided the prompt it was queued for is still the live one.
         function speakLetterNow(L) {
-            if (state.mode !== 'lettersound' || state.letter !== L) return false;
+            if (!isLetterMode() || state.letter !== L) return false;
             if (!speechAvailable()) return false;
 
             try {
@@ -1775,14 +1776,14 @@
                 placeStamp(L.x, L.y, true);
                 awardReward();
                 spawnLetter();
-                if (state.mode === 'lettersound') speakLetterPrompt();
+                speakLetterPrompt();
             } else {
                 L.wrongCount = (L.wrongCount || 0) + 1;
                 L.shakeUntil = performance.now() + 450;
                 playWrongKeyBuzz();
                 // Say the letter again once the child has missed REPEAT_AFTER_WRONG times,
                 // leaving room for the buzz to finish first
-                if (state.mode === 'lettersound' && L.wrongCount % REPEAT_AFTER_WRONG === 0) {
+                if (L.wrongCount % REPEAT_AFTER_WRONG === 0) {
                     speakLetterPrompt(420);
                 }
             }
@@ -1820,7 +1821,7 @@
             if (state.mode === 'reward') spawnRewardTarget();
             if (isLetterMode()) {
                 spawnLetter();
-                if (state.mode === 'lettersound') speakLetterPrompt();
+                speakLetterPrompt();
             }
             startAnimationLoop();
         }
@@ -1861,6 +1862,8 @@
             if (modeId === 'lettersound' && !speakLetterPrompt()) {
                 if (state.letter) state.letter.reveal = true;
                 showToast('This browser cannot speak; showing the letter instead.');
+            } else if (modeId === 'letter') {
+                speakLetterPrompt();
             }
 
             if (showHud) startAnimationLoop();
